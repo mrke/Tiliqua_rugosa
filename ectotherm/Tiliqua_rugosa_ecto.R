@@ -75,7 +75,7 @@ PTUREA<-0. # %, water in excreted nitrogenous waste
 FoodWater<-82#82 # 82%, water content of food (from Shine's thesis, clover)
 minwater<-8 # %, minimum tolerated dehydration (% of wet mass) - prohibits foraging if greater than this
 raindrink<-2.5 # daily rainfall (mm) required for animal to rehydrate from drinking (zero means standing water always available)
-gutfill<-100. # % gut fill at which satiation occurs - if greater than 100%, animal always tries to forage
+gutfill<-75. # % gut fill at which satiation occurs - if greater than 100%, animal always tries to forage
 
 # behavioural traits
 dayact<-1 # diurnal activity allowed (1) or not (0)?
@@ -726,7 +726,7 @@ for(i in 1:121){
     mtext(text="hour of day",side=2, padj=-3)
     mtext(text="day of year",side=1, padj=3)
 
-    with(plotenviron_night, {points(TIME+2~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=0.5,col=addTrans("dark grey",50),pch=16)})
+    with(plotenviron_night, {points(TIME+2~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=0.5,col="dark grey",pch=16)})
     
     rbPal <- colorRampPalette(c('turquoise','gold1'))
     
@@ -741,8 +741,8 @@ for(i in 1:121){
     plotenviron_bask$Col<-Tbs[1:nrow(plotenviron_bask),2]
     plotenviron_bask$Col <- rbPal(10)[as.numeric(cut(plotenviron_bask$TC,breaks = 10))]
     #with(plotenviron_forage, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col=plotenviron_bask$Col,pch=15)})
-    with(plotenviron_bask, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col=plotenviron_bask$Col,pch=15)})
-
+    with(plotenviron_bask, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col="light blue",pch=15)})
+    with(plotenviron_forage, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col="gold",pch=15)})
     with(plotlizard_forage, {points(Hours+1~doy, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=log(plotlizard_forage$Steps/300),pch=15,col=addTrans("red",100))}) #col="#0000FF96" #0000FFFF
     with(desic, {points(desic~day, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",lwd=2,pch=15,col='blue',type='l',lty=2)})
     with(plotrainfall2, {points(RAINFALL~JULDAY, type = "h",col='blue')})
@@ -881,7 +881,7 @@ for(i in 1:121){
   sexliz<-subset(sex,Liz==sleepy_id)
   sexliz<-sexliz[2]
   sexlizard<-as.character(sexliz)
-  if(sexlizard=="integer(0)"){
+  if(sexlizard=="u" | sexlizard=="character(0)"){
     sexlizard<-'unknown'
   }
   if(sexlizard==2){
@@ -947,11 +947,16 @@ for(i in 1:121){
   }
 } #end loop through lizards
 
+allforage_2009<-allforage
+allnoforage_2009<-allnoforage
+allwaddleobs_2009<-allwaddleobs
+allforage_2010<-allforage
+
 startdy<-250
 finishdy<-355
 
 #with(plotlizard_noforage, {plot(Hours+1~doy, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1,pch=15,col='ivory 4')})
-with(plotenviron_night, {plot(TIME+2~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=0.5,col=addTrans("dark grey",50),pch=16)})
+with(plotenviron_night, {plot(TIME+2~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=0.5,col="dark grey",pch=16)})
 
 rbPal <- colorRampPalette(c('turquoise','gold1'))
 
@@ -964,6 +969,7 @@ Tbs$Col<-rbPal(23)[as.numeric(cut(Tbs$Tb, breaks=seq(18, 37,1), include.lowest=T
 plotenviron_bask$Col<-Tbs[1:nrow(plotenviron_bask),2]
 #plotenviron_bask$Col <- rbPal(10)[as.numeric(cut(plotenviron_bask$TC,breaks = 10))]
 with(plotenviron_bask, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col=plotenviron_bask$Col,pch=15)})
+with(plotenviron_bask, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1,col="gold",pch=15)})
 #with(plotlizard_forage, {points(Hours+1~doy, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=log(plotlizard_forage$Steps/300),pch=15,col=addTrans("red",100))}) #col="#0000FF96" #0000FFFF
 with(desic, {points(desic~day, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",lwd=2,pch=15,col='blue',type='l',lty=2)})
 with(plotrainfall2, {points(RAINFALL~JULDAY, type = "h",col='blue')})
@@ -977,7 +983,8 @@ meandoy<-aggregate(allforage$doy,by=list(paste(allforage$Year,"_",allforage$Mont
 meanwaddle<-cbind(meanwaddle,meanhour[,2],meandoy[,2])
 colnames(meanwaddle)<-c('date','Steps','Hours','doy')
 #meanwaddle_female<-meanwaddle
-with(meanwaddle, {points(Hours+1~doy, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=meanwaddle$Steps/30000,pch=15,col=addTrans("red",100))}) #col="#0000FF96" #0000FFFF
+with(meanwaddle, {points(Hours+1~doy, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=log(meanwaddle$Steps/10000+1),pch=15,col=addTrans("red",100))}) #col="#0000FF96" #0000FFFF
+with(meanwaddle, {points(Hours+1~doy, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=meanwaddle$Steps/25000,pch=15,col=addTrans("red",100))}) #col="#0000FF96" #0000FFFF
 
 
 
@@ -1146,8 +1153,26 @@ with(plotenviron, {xyplot(TC+ACT*10+SHADE/10+DEP/10~dates,type = "l")})
 plotenviron_bask <- subset(plotenviron,  subset=(ACT>=1 & TC>=TMINPR))
 plotenviron_forage <- subset(plotenviron,  subset=(ACT>1))
 plotenviron_trap <- subset(plotenviron,  subset=(ACT>=1 & SHADE==0 & TC>=TMINPR))
-with(plotenviron_bask, {plot(TIME~DAY, ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1,col='gray',pch=15)})
-with(plotenviron_trap, {points(TIME~DAY, ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1,col='black',pch=15)})
+with(plotenviron_bask, {plot(TIME~DAY, ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1,col='gold',pch=15)})
+#with(plotenviron_trap, {points(TIME~DAY, ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1,col='black',pch=15)})
+
+startdy<-250
+finishdy<-355
+
+#with(plotlizard_noforage, {plot(Hours+1~doy, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1,pch=15,col='ivory 4')})
+with(plotenviron_night, {points(TIME+2~JULDAY, ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=0.5,col="dark grey",pch=16)})
+
+doy2<-strptime(format(rainfall$dates, "%y/%m/%d"), "%y/%m/%d")$yday+1
+plotrainfall2<-cbind(doy2,rainfall)
+#plotgrass<-cbind(doy2,plotgrass)
+colnames(plotrainfall2)<-c("JULDAY","dates","RAINFALL")
+desic<-subset(debout,TIME==24 )
+desic<-as.data.frame(cbind(desic[,2],desic[,20]))
+colnames(desic)<-c('day','desic')
+doy2<-as.numeric(rownames(desic))
+
+with(desic, {points(desic~doy2, ylim=c(0,25),xlab = "day of year",ylab = "hour of day",lwd=2,pch=15,col='blue',type='l',lty=2)})
+with(plotrainfall2, {points(RAINFALL~doy2, type = "h",col='blue')})
 
 wetgut<-as.data.frame(((plotdebout$MASS_GUT/mu_E)*23.9)/d_V)
 wetgut<-cbind(plotdebout$dates,wetgut)
@@ -1156,17 +1181,17 @@ with(wetgut,plot(wetgut~dates,type='l',ylim=c(-.25,50)))
 #with(plotgrass,points(growth*50~dates,type='l',col='grey'))
 
 #average male/female
-with(plotdebout, {plot(((WETMASS-WETMASS*(Body_cond/100))+(WETMASS_STD-WETMASS_STD*(Body_cond/100)))/2~dates,ylim=c(400,850),type = "l",xlab = "day of year",ylab = "wet mass (g)")})
+with(plotdebout, {plot(((WETMASS-WETMASS*(Body_cond/100))+(WETMASS_STD-WETMASS_STD*(Body_cond/100)))/2~dates,ylim=c(400,650),type = "l",xlab = "day of year",ylab = "wet mass (g)")})
 with(plotdebout, {points(((WETMASS)+(WETMASS_STD))/2~dates,type = "l",col='4',ylim=c(400,650))})
 with(Kerr_fig5,points(Mass~date_Kerr,type='b',col='red'))
 
 #male
-with(plotdebout, {plot((WETMASS_STD-WETMASS_STD*(Body_cond/100))~dates,ylim=c(400,850),type = "l",xlab = "day of year",ylab = "wet mass (g)")})
+with(plotdebout, {plot((WETMASS_STD-WETMASS_STD*(Body_cond/100))~dates,ylim=c(400,750),type = "l",xlab = "day of year",ylab = "wet mass (g)")})
 with(plotdebout, {points(WETMASS_STD~dates,type = "l",col='4',ylim=c(400,650))})
 with(Kerr_fig5,points(Mass~date_Kerr,type='b',col='red'))
 
 #female
-with(plotdebout, {plot((WETMASS-WETMASS*(Body_cond/100))~dates,ylim=c(400,850),type = "l",xlab = "day of year",ylab = "wet mass (g)")})
+with(plotdebout, {plot((WETMASS-WETMASS*(Body_cond/100))~dates,ylim=c(400,750),type = "l",xlab = "day of year",ylab = "wet mass (g)")})
 with(plotdebout, {points(WETMASS~dates,type = "l",col='4',ylim=c(400,650))})
 with(Kerr_fig5,points(Mass~date_Kerr,type='b',col='red'))
 
