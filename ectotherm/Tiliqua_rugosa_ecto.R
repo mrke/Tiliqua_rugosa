@@ -1037,8 +1037,8 @@ lizards<-subset(waddlefiles,year==2009)
 lizards<-lizards$id
 k<-0
 for(i in 1:length(lizards)){
-#i<-9# 32 or 9 
-
+  #i<-9# 32 or 9 
+  
   #sleepy_id<-waddlefiles[i,2]
   sleepy_id<-lizards[i]
   sexliz<-subset(sex,Liz==sleepy_id)
@@ -1057,36 +1057,37 @@ for(i in 1:length(lizards)){
   
   sleepy<-as.data.frame(read.table(file = paste('/NicheMapR_Working/projects/sleepy lizards/waddle/',sleepy_id,'_2009_ALL.csv',sep=""), sep = ",", head=TRUE))
   #sleepy<-as.data.frame(read.table(file = paste('/NicheMapR_Working/projects/sleepy lizards/waddle/',waddlefiles[i,3],sep=""), sep = ",", head=TRUE))
-  sleepy<-subset(sleepy,Month==11 & Day<20 & Day>13)
-if(nrow(sleepy)>0){
-# prepare UTM coordinates matrix
-UTMzone<-(floor((longlat[1] + 180)/6) %% 60)
-xy<-na.omit(as.data.frame(cbind(sleepy$Easting,sleepy$Northing)))
-  if(nrow(xy)>4){
-    k=k+1
-xy<-xy[xy[,1]>0,]
+  sleepy<-subset(sleepy,Month==11 & Day<20 & Day>12) #  & Day<28 & Day>20 week either side of 21th Nov, when little drought broke
+  if(nrow(sleepy)>0){
+    # prepare UTM coordinates matrix
+    UTMzone<-(floor((longlat[1] + 180)/6) %% 60)
+    xy<-na.omit(as.data.frame(cbind(sleepy$Easting,sleepy$Northing)))
     if(nrow(xy)>4){
-utmcoor<-SpatialPoints(xy, proj4string=CRS(paste("+proj=utm +south +zone=",54,sep="")))
-#utmdata$X and utmdata$Y are corresponding to UTM Easting and Northing, respectively.
-#zone= UTM zone
-# converting
-  longlats<-spTransform(utmcoor,CRS("+proj=longlat"))
-    cp <- mcp(longlats, percent=95)
-  cp<-SpatialPolygons(cp@polygons)
-  cp<-as.data.frame(getEdges(cp))
-  colnames(cp)<-c("x","y")
-longlatcoor<-as.data.frame(longlats)
-    #plot(googlemap+ geom_point(data=longlatcoor, aes(x=x, y=y),colour = i, size = 0.5))
-   # plot(googlemap + geom_polygon(data = cp, aes(x = x, y = y),color=i,fill="NA"))
-
-if(k==1){
-  allcoords<-cbind(i,sleepy_id,cp)
-}else{
-  allcoords<-rbind(allcoords,cbind(i,sleepy_id,cp))
-}
-}}
-}
-
+      k=k+1
+      xy<-xy[xy[,1]>0,]
+      if(nrow(xy)>4){
+        utmcoor<-SpatialPoints(xy, proj4string=CRS(paste("+proj=utm +south +zone=",54,sep="")))
+        #utmdata$X and utmdata$Y are corresponding to UTM Easting and Northing, respectively.
+        #zone= UTM zone
+        # converting
+        longlats<-spTransform(utmcoor,CRS("+proj=longlat"))
+        cp <- mcp(longlats, percent=95)
+        cp<-SpatialPolygons(cp@polygons)
+        cp<-as.data.frame(getEdges(cp))
+        colnames(cp)<-c("x","y")
+        longlatcoor<-as.data.frame(longlats)
+        #plot(googlemap+ geom_point(data=longlatcoor, aes(x=x, y=y),colour = i, size = 0.5))
+        # plot(googlemap + geom_polygon(data = cp, aes(x = x, y = y),color=i,fill="NA"))
+        
+        if(k==1){
+          allcoords<-cbind(i,sleepy_id,cp)
+        }else{
+          allcoords<-rbind(allcoords,cbind(i,sleepy_id,cp))
+        }
+      }
+    }
+  }
+  
 }
 colnames(allcoords)<-c('id','value','x','y')
 library(ggmap)
