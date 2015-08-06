@@ -75,7 +75,7 @@ PTUREA<-0. # %, water in excreted nitrogenous waste
 FoodWater<-82#82 # 82%, water content of food (from Shine's thesis, clover)
 minwater<-8 # %, minimum tolerated dehydration (% of wet mass) - prohibits foraging if greater than this
 raindrink<-2.5 # daily rainfall (mm) required for animal to rehydrate from drinking (zero means standing water always available)
-gutfill<-75. # % gut fill at which satiation occurs - if greater than 100%, animal always tries to forage
+gutfill<-75 # % gut fill at which satiation occurs - if greater than 100%, animal always tries to forage
 
 # behavioural traits
 dayact<-1 # diurnal activity allowed (1) or not (0)?
@@ -336,8 +336,11 @@ colnames(rainfall)<-c("dates","rainfall")
 
 ############### plot results ######################
 library(lattice)
+#write.csv(environ,'environ_dam.csv')
+#write.csv(debout,'debout_dam.csv')
 
-
+#environ<-read.csv('environ_75gut.csv')[,-1]
+#debout<-read.csv('debout_75gut.csv')[,-1]
 #setwd('/NicheMapR_Working/projects/Sleepy Lizards/')
 # environ_write<-cbind(environ,debout[,6:21])
 # if(raindrink==0){
@@ -544,6 +547,8 @@ par(bty="l")
 boxplot(massagg_merge$mass.x,massagg_merge$mass.y,xlab="Time",ylab="Measure",names=c("desiccated","hydrated"),col=c("lightblue","lightgreen"),ylim=c(400,1000))
 stripchart(list(massagg_merge$mass.x,massagg_merge$mass.y),vertical=T,pch=16,cex=0.5,add=T)
 segments(rep(0.95,length(massagg_merge$mass.x))[s],massagg_merge$mass.x[s],rep(2,length(massagg_merge$mass.x))[s],massagg_merge$mass.y[s],col='light grey',lwd=0.5)
+
+
 
 yearstodo<-c(2009,2010)
 for(m in 1:2){
@@ -1013,122 +1018,355 @@ with(plotrainfall2, {points(RAINFALL~JULDAY, type = "h",col='blue')})
 
 
 ######################### Tbs specific period and individual, average per hour ######################################
-
-
-liz2do<-9
-
-sleepy_id<-waddlefiles[liz2do,2]
-sexliz<-subset(sex,Liz==sleepy_id)
-sexliz<-sexliz[2]
-sexlizard<-as.character(sexliz)
-if(sexlizard=="integer(0)"){
-  sexlizard<-'unknown'
+getEdges <- function(x) {
+    stopifnot(class(x) == "SpatialPolygons")
+    lapply(x@polygons, function(y) {
+                y@Polygons[[1]]@coords
+            })
 }
-if(sexlizard==2){
-  sexlizard<-'F'
-}
-if(sexlizard==3){
-  sexlizard<-'M'
-}
-#sleepy<-as.data.frame(read.table(file = paste('/NicheMapR_Working/projects/sleepy lizards/waddle/',sleepy_id,'_2009_ALL.csv',sep=""), sep = ",", head=TRUE))
-sleepy<-as.data.frame(read.table(file = paste('/NicheMapR_Working/projects/sleepy lizards/waddle/',waddlefiles[liz2do,3],sep=""), sep = ",", head=TRUE))
-if(is.null(sleepy$Hours)){
-  Hours<-as.numeric(substr(sleepy$Time,1,2))
-  Minutes<-as.numeric(substr(sleepy$Time,4,5))
-  sleepy<-as.data.frame(cbind(sleepy,Hours,Minutes))
-  write.table(sleepy,file = paste('/NicheMapR_Working/projects/sleepy lizards/waddle/',waddlefiles[liz2do,3],sep=""),row.names=F,sep=",") 
-}
-curyear<-max(sleepy$Year,na.rm=TRUE)
+getEdges(cp)
 
 
-plotrainfall <- subset(rainfall,substr(dates,1,4)==curyear)
+library(adehabitatHR)
+activelizards<-c(9532,9372,9364,9363,9310,40044,40012,12847,12434,11885,11505,10509)
+lizards<-activelizards
 
-date_waddle1<-with(sleepy,ISOdatetime(Year,Month,Day,Hours,Minutes,0))
-date_waddle<-date_waddle1+60*60 # adjust for Central Time
-doy<-strptime(format(date_waddle, "%y/%m/%d"), "%y/%m/%d")$yday+1
-doy2<-strptime(format(plotrainfall$dates, "%y/%m/%d"), "%y/%m/%d")$yday+1
-sleepy<-cbind(date_waddle,doy,sleepy)
-plotrainfall2<-cbind(doy2,plotrainfall)
-#plotgrass<-cbind(doy2,plotgrass)
-colnames(plotrainfall2)<-c("JULDAY","dates","RAINFALL")
-desic<-subset(debout,TIME==24 & substr(dates,1,4)==curyear)
-desic<-as.data.frame(cbind(desic[,2],desic[,20]))
-colnames(desic)<-c('day','desic')
+lizards<-subset(waddlefiles,year==2009 & !(id%in%activelizards))
+lizards<-subset(waddlefiles,year==2009)
 
+lizards<-lizards$id
+k<-0
+for(i in 1:length(lizards)){
+#i<-9# 32 or 9 
 
-date_waddle<-aggregate(sleepy$date_waddle,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),min)
-doy<-aggregate(sleepy$doy,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),max)
-Tb<-aggregate(sleepy$Temperature,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),mean)
-steps<-aggregate(sleepy$Steps,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),sum)
-year<-aggregate(sleepy$Year,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),max)
-month<-aggregate(sleepy$Month,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),max)
-day<-aggregate(sleepy$Day,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),max)
-hours<-aggregate(sleepy$Hours,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),max)
-sleepy<-as.data.frame(cbind(as.data.frame(date_waddle[,2]),doy[,2],Tb[,2],steps[,2],year[,2],month[,2],day[,2],hours[,2]))
-sleepy2<-as.data.frame(cbind(as.data.frame(date_waddle[,2]),doy[,2],Tb[,2],steps[,2],year[,2],month[,2],day[,2],hours[,2],date_waddle$Group.1))
-colnames(sleepy)<-c('date_waddle','doy','Temperature','Steps','Year','Month','Day','Hours')
-colnames(sleepy2)<-c('date_waddle','doy','Temperature','Steps','Year','Month','Day','Hours','merge')
-
-
-daystart<-paste(substr(curyear,3,4),'/09/25',sep="") # y/m/d
-dayfin<-paste(substr(curyear,3,4),'/12/30',sep="") # y/m/d
-plotpred<-subset(environ, format(environ$dates, "%y/%m/%d")>= daystart & format(environ$dates, "%y/%m/%d")<=dayfin)
-plotdeb<-subset(debout, format(debout$dates, "%y/%m/%d")>= daystart & format(environ$dates, "%y/%m/%d")<=dayfin)
-plotmetout<-subset(metout, format(metout$dates, "%y/%m/%d")>= daystart & format(metout$dates, "%y/%m/%d")<=dayfin)
-plotlizard<-subset(sleepy, format(sleepy$date_waddle, "%y/%m/%d")>= daystart & format(sleepy$date_waddle, "%y/%m/%d")<=dayfin)
-plotlizard <- plotlizard[order(plotlizard$date_waddle),] 
-plotlizard2<-plotlizard
-colnames(plotlizard2)[1] <- "dates"
-
-# round the times to get rid of occasional 1 min addons
-x<-plotlizard2$dates
-r <-  60*60
-
-H <- as.integer(format(x, "%H"))
-M <- as.integer(format(x, "%M"))
-S <- as.integer(format(x, "%S"))
-D <- format(x, "%Y-%m-%d")
-secs <- 3600*H + 60*M + S
-x<-as.POSIXct(round(secs/r)*r, origin=D)-11*3600
-plotlizard2$dates<-x
-# end rounding times
-
-plotlizard2<-merge(plotlizard2,plotpred,all=TRUE) # merge to avoid continuous line between sample gaps
-plotlizard3<-plotlizard2
-for(i in 1:nrow(plotlizard2)){ # make values average of prev hour to account for 1/2 time diff in SA
-  if(i==1){
-    plotlizard3[i,3]<-plotlizard2[i,3]
-  }else{
-    plotlizard3[i,3]<-(plotlizard2[i,3]+plotlizard2[i-1,3])/2
+  #sleepy_id<-waddlefiles[i,2]
+  sleepy_id<-lizards[i]
+  sexliz<-subset(sex,Liz==sleepy_id)
+  sexliz<-sexliz[2]
+  sexlizard<-as.character(sexliz)
+  if(sexlizard=="u" | sexlizard=="character(0)"){
+    sexlizard<-'unknown'
   }
+  if(sexlizard==2){
+    sexlizard<-'F'
+  }
+  if(sexlizard==3){
+    sexlizard<-'M'
+  }
+  
+  
+  sleepy<-as.data.frame(read.table(file = paste('/NicheMapR_Working/projects/sleepy lizards/waddle/',sleepy_id,'_2009_ALL.csv',sep=""), sep = ",", head=TRUE))
+  #sleepy<-as.data.frame(read.table(file = paste('/NicheMapR_Working/projects/sleepy lizards/waddle/',waddlefiles[i,3],sep=""), sep = ",", head=TRUE))
+  sleepy<-subset(sleepy,Month==11 & Day<20 & Day>13)
+if(nrow(sleepy)>0){
+# prepare UTM coordinates matrix
+UTMzone<-(floor((longlat[1] + 180)/6) %% 60)
+xy<-na.omit(as.data.frame(cbind(sleepy$Easting,sleepy$Northing)))
+  if(nrow(xy)>4){
+    k=k+1
+xy<-xy[xy[,1]>0,]
+    if(nrow(xy)>4){
+utmcoor<-SpatialPoints(xy, proj4string=CRS(paste("+proj=utm +south +zone=",54,sep="")))
+#utmdata$X and utmdata$Y are corresponding to UTM Easting and Northing, respectively.
+#zone= UTM zone
+# converting
+  longlats<-spTransform(utmcoor,CRS("+proj=longlat"))
+    cp <- mcp(longlats, percent=95)
+  cp<-SpatialPolygons(cp@polygons)
+  cp<-as.data.frame(getEdges(cp))
+  colnames(cp)<-c("x","y")
+longlatcoor<-as.data.frame(longlats)
+    #plot(googlemap+ geom_point(data=longlatcoor, aes(x=x, y=y),colour = i, size = 0.5))
+   # plot(googlemap + geom_polygon(data = cp, aes(x = x, y = y),color=i,fill="NA"))
+
+if(k==1){
+  allcoords<-cbind(i,sleepy_id,cp)
+}else{
+  allcoords<-rbind(allcoords,cbind(i,sleepy_id,cp))
+}
+}}
 }
 
-#plotlizard2$dates<-plotlizard2$dates+60*30 # adjust for Central Time   #-60*60*8
+}
+colnames(allcoords)<-c('id','value','x','y')
+library(ggmap)
+ggplot(data=allcoords,aes(x = x, y = y, group = id))
 
-with(plotpred, {plot(TC~dates,type = "l",ylim=c(0,40))})
-#with(plotmetout, {points(TAREF~dates,type = "l",col='grey')})
+googlemap = ggmap(get_map(location = c(lon = longlat[1], lat = longlat[2]), zoom = 16, maptype = 'satellite',filename = "ggmapTemp.png"))
+plot(googlemap+ geom_point(data=allcoords, aes(x=x, y=y),colour = factor(allcoords$i), size = 0.5))
+plot(googlemap+ geom_polygon(data = subset(allcoords,id==1), aes(x = x, y = y),color=1,fill="NA")
+  + geom_polygon(data = subset(allcoords,id==2), aes(x = x, y = y),color=2,fill="NA")
+  + geom_polygon(data = subset(allcoords,id==3), aes(x = x, y = y),color=3,fill="NA")
+  + geom_polygon(data = subset(allcoords,id==4), aes(x = x, y = y),color=4,fill="NA")
+  + geom_polygon(data = subset(allcoords,id==5), aes(x = x, y = y),color=5,fill="NA")
+  + geom_polygon(data = subset(allcoords,id==6), aes(x = x, y = y),color=6,fill="NA")
+  + geom_polygon(data = subset(allcoords,id==7), aes(x = x, y = y),color=7,fill="NA")
+  + geom_polygon(data = subset(allcoords,id==8), aes(x = x, y = y),color=8,fill="NA")
+  + geom_polygon(data = subset(allcoords,id==9), aes(x = x, y = y),color=9,fill="NA")
+  + geom_polygon(data = subset(allcoords,id==10), aes(x = x, y = y),color=10,fill="NA")
+  + geom_polygon(data = subset(allcoords,id==11), aes(x = x, y = y),color=11,fill="NA")
+  + geom_polygon(data = subset(allcoords,id==12), aes(x = x, y = y),color=12,fill="NA")
+  )
 
-with(plotlizard3, {points(Temperature~dates,type = "l",col=addTrans("red",150))})
-with(plotdeb, {points(Body_cond~dates,type = "l",col='blue',lty=2,lwd=2)})
-with(plotrainfall2, {points(RAINFALL~dates, type = "h",col='blue')})
-#with(plotgrass, {points(growth~dates, type = "l",col='dark green')})
 
-plotlizard_corr2<-na.omit(plotlizard2)
-plotlizard_corr3<-na.omit(plotlizard3)
-lm_2<-with(plotlizard_corr2,(lm(TC~Temperature)))
-lm2_R2<-summary(lm_2)$r.squared
-lm2_rmsd<-sqrt(mean(((plotlizard_corr2$Temperature-plotlizard_corr2$TC)^2),na.rm=TRUE))
-lm2_R2
-lm2_rmsd
-plot(plotlizard_corr2$Temperature~plotlizard_corr2$TC)
-abline(0,1)
-lm_3<-with(plotlizard_corr3,(lm(TC~Temperature)))
-lm3_R2<-summary(lm_3)$r.squared
-lm3_rmsd<-sqrt(mean(((plotlizard_corr3$Temperature-plotlizard_corr3$TC)^2),na.rm=TRUE))
-lm3_R2
-lm3_rmsd
-plot(plotlizard_corr3$Temperature~plotlizard_corr3$TC)
-abline(0,1)
+plot(googlemap
+  + geom_polygon(data = subset(allcoords,id==1), aes(x = x, y = y),color=1,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==2), aes(x = x, y = y),color=2,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==3), aes(x = x, y = y),color=3,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==4), aes(x = x, y = y),color=4,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==5), aes(x = x, y = y),color=5,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==6), aes(x = x, y = y),color=6,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==7), aes(x = x, y = y),color=7,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==8), aes(x = x, y = y),color=8,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==9), aes(x = x, y = y),color=9,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==10), aes(x = x, y = y),color=10,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==11), aes(x = x, y = y),color=11,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==12), aes(x = x, y = y),color=12,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==13), aes(x = x, y = y),color=13,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==14), aes(x = x, y = y),color=14,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==15), aes(x = x, y = y),color=15,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==16), aes(x = x, y = y),color=16,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==17), aes(x = x, y = y),color=17,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==18), aes(x = x, y = y),color=18,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==19), aes(x = x, y = y),color=19,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==20), aes(x = x, y = y),color=20,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==21), aes(x = x, y = y),color=21,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==22), aes(x = x, y = y),color=22,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==23), aes(x = x, y = y),color=23,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==24), aes(x = x, y = y),color=24,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==25), aes(x = x, y = y),color=25,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==26), aes(x = x, y = y),color=26,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==27), aes(x = x, y = y),color=27,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==28), aes(x = x, y = y),color=28,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==29), aes(x = x, y = y),color=29,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==30), aes(x = x, y = y),color=30,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==31), aes(x = x, y = y),color=31,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==32), aes(x = x, y = y),color=32,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==33), aes(x = x, y = y),color=33,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==34), aes(x = x, y = y),color=34,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==35), aes(x = x, y = y),color=35,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==36), aes(x = x, y = y),color=36,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==37), aes(x = x, y = y),color=37,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==38), aes(x = x, y = y),color=38,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==39), aes(x = x, y = y),color=39,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==40), aes(x = x, y = y),color=40,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==41), aes(x = x, y = y),color=41,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==42), aes(x = x, y = y),color=42,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==43), aes(x = x, y = y),color=43,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==44), aes(x = x, y = y),color=44,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==45), aes(x = x, y = y),color=45,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==46), aes(x = x, y = y),color=46,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==47), aes(x = x, y = y),color=47,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==48), aes(x = x, y = y),color=48,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==49), aes(x = x, y = y),color=49,fill='NA')
+ + geom_polygon(data = subset(allcoords,id==50), aes(x = x, y = y),color=50,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==51), aes(x = x, y = y),color=51,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==52), aes(x = x, y = y),color=52,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==53), aes(x = x, y = y),color=53,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==54), aes(x = x, y = y),color=54,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==55), aes(x = x, y = y),color=55,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==56), aes(x = x, y = y),color=56,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==57), aes(x = x, y = y),color=57,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==58), aes(x = x, y = y),color=58,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==59), aes(x = x, y = y),color=59,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==60), aes(x = x, y = y),color=60,fill='NA')
+  + geom_polygon(data = subset(allcoords,id==61), aes(x = x, y = y),color=61,fill='NA')
+
+
+
+  )
+
+
+
+# eval(parse(text=paste("googlemap + geom_point(data=as.data.frame(longlatcoor), aes(x=x, y=y),colour = 'yellow', size = 0.5)" )))
+plot(googlemap+ geom_polygon(data = allcoords, aes(x = x, y = y),color=factor(allcoords$i),fill="NA",group=i))
+
+ paste("+ geom_point(data=as.data.frame(",longlatcoors,"), aes(x=x, y=y),colour = 'yellow', size = 0.5)",sep="")
+
+ggmap(al1)#+ geom_point(data=longlatcoor, aes(x=x, y=y),colour = "yellow", size = 0.5)
+qmplot(x, y, data = longlatcoor, color = class, darken = .6)
+
+al1MAP+ geom_point(data=as.data.frame(longlatcoor), aes(x=x, y=y),colour = "yellow", size = 0.5)
+
+
+
+
+  curyear<-max(sleepy$Year,na.rm=TRUE)
+     plotrainfall <- subset(rainfall,substr(dates,1,4)==curyear)
+    plotenviron_bask <- subset(plotenviron5,  subset=(ACT>=1 & TC>=TBASK & substr(dates,1,4)==curyear))
+    plotenviron_forage <- subset(plotenviron5,  subset=(ACT>1 & substr(dates,1,4)==curyear))
+    plotenviron_night<- subset(metout,  subset=(ZEN==90))
+    plotenviron_night$TIME<-plotenviron_night$TIME/60-1
+    date_waddle1<-with(sleepy,ISOdatetime(Year,Month,Day,Hours,Minutes,0))
+    date_waddle<-date_waddle1+60*60 # adjust for Central Time
+    doy<-strptime(format(date_waddle, "%y/%m/%d"), "%y/%m/%d")$yday+1
+    doy2<-strptime(format(plotrainfall$dates, "%y/%m/%d"), "%y/%m/%d")$yday+1
+    sleepy<-cbind(date_waddle,doy,sleepy)
+    plotrainfall2<-cbind(doy2,plotrainfall)
+    #plotgrass<-cbind(doy2,plotgrass)
+    colnames(plotrainfall2)<-c("JULDAY","dates","RAINFALL")
+    desic<-subset(debout,TIME==24 & substr(dates,1,4)==curyear)
+    desic<-as.data.frame(cbind(desic[,2],desic[,20]))
+    colnames(desic)<-c('day','desic')
+    
+    date_waddle<-aggregate(sleepy$date_waddle,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),min)
+    doy<-aggregate(sleepy$doy,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),max)
+    Tb<-aggregate(sleepy$Temperature,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),mean)
+    steps<-aggregate(sleepy$Steps,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),sum)
+    year<-aggregate(sleepy$Year,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),max)
+    month<-aggregate(sleepy$Month,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),max)
+    day<-aggregate(sleepy$Day,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),max)
+    hours<-aggregate(sleepy$Hours,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),max)
+    sleepy<-as.data.frame(cbind(as.data.frame(date_waddle[,2]),doy[,2],Tb[,2],steps[,2],year[,2],month[,2],day[,2],hours[,2]))
+    
+    colnames(sleepy)<-c('date_waddle','doy','Temperature','Steps','Year','Month','Day','Hours')
+    
+    
+    
+    # round the times to get rid of occasional 1 min addons
+    x<-sleepy$date_waddle
+    r <-  60*60
+    
+    H <- as.integer(format(x, "%H"))
+    M <- as.integer(format(x, "%M"))
+    S <- as.integer(format(x, "%S"))
+    D <- format(x, "%Y-%m-%d")
+    secs <- 3600*H + 60*M + S
+    x<-as.POSIXct(round(secs/r)*r, origin=D)-11*3600
+    sleepy$date_waddle<-x
+    # end rounding times
+    
+    
+    sleepy2<-as.data.frame(as.data.frame(cbind(date_waddle[,2],doy[,2],Tb[,2],steps[,2],year[,2],month[,2],day[,2],hours[,2],date_waddle$Group.1)))
+    colnames(sleepy2)<-c('date_waddle','doy','Temperature','Steps','Year','Month','Day','Hours','merge')
+    
+    
+    sleepy2$Temperature<-as.factor(sleepy$Temperature)
+    
+    correl<-merge(sleepy2,plotenviron5,by='merge')
+    correl_day<-subset(correl,ZEN!=90)
+    c.doy<-as.numeric(levels(correl$doy))[correl$doy]
+    c.year<-as.numeric(levels(correl$Year))[correl$Year]
+    c.month<-as.numeric(levels(correl$Month))[correl$Month]
+    c.day<-as.numeric(levels(correl$Day))[correl$Day]
+    c.hour<-as.data.frame(correl$TIME)
+    c.Tb_obs<-as.numeric(levels(correl$Temperature))[correl$Temperature]
+    c.steps<-as.numeric(levels(correl$Steps))[correl$Steps]
+    c.Tb_pred<-as.data.frame(correl$TC)
+    c.act<-as.data.frame(correl$ACT)
+    c.shade<-as.data.frame(correl$SHADE)
+    correl2<-cbind(correl$dates,c.doy,c.year,c.month,c.day,c.hour,c.Tb_obs,c.steps,c.Tb_pred,c.act,c.shade)
+    colnames(correl2)<-c('date','doy','year','month','day','hour','Tb_obs','steps','Tb_pred','act','shade')
+    
+    c.doy.day<-as.numeric(levels(correl_day$doy))[correl_day$doy]
+    c.year.day<-as.numeric(levels(correl_day$Year))[correl_day$Year]
+    c.month.day<-as.numeric(levels(correl_day$Month))[correl_day$Month]
+    c.day.day<-as.numeric(levels(correl_day$Day))[correl_day$Day]
+    c.hour.day<-as.data.frame(correl_day$TIME)
+    c.Tb_obs.day<-as.numeric(levels(correl_day$Temperature))[correl_day$Temperature]
+    c.steps.day<-as.numeric(levels(correl_day$Steps))[correl_day$Steps]
+    c.Tb_pred.day<-as.data.frame(correl_day$TC)
+    c.act.day<-as.data.frame(correl_day$ACT)
+    c.shade.day<-as.data.frame(correl_day$SHADE)
+    correl2.day<-cbind(correl_day$dates,c.doy.day,c.year.day,c.month.day,c.day.day,c.hour.day,c.Tb_obs.day,c.steps.day,c.Tb_pred.day,c.act.day,c.shade.day)
+    colnames(correl2.day)<-c('date','doy','year','month','day','hour','Tb_obs','steps','Tb_pred','act','shade')
+    
+    mean_Tb_obs<-mean(correl2$Tb_obs,na.rm=TRUE)
+    max_Tb_obs<-max(correl2$Tb_obs,na.rm=TRUE)
+    min_Tb_obs<-min(correl2$Tb_obs,na.rm=TRUE)
+    med_Tb_obs<-median(correl2$Tb_obs,na.rm=TRUE)
+    mean_Tb_pred<-mean(correl2$Tb_pred,na.rm=TRUE)
+    max_Tb_pred<-max(correl2$Tb_pred,na.rm=TRUE)
+    min_Tb_pred<-min(correl2$Tb_pred,na.rm=TRUE)
+    med_Tb_pred<-median(correl2$Tb_pred,na.rm=TRUE)
+    
+    
+    lm_Tb<-with(correl2,(lm(Tb_pred~Tb_obs)))
+    r_Tb<-with(correl2,cor(Tb_pred,Tb_obs))
+    #with(correl2,(plot(Tb_pred~Tb_obs)))
+    #abline(0,1)
+    lm_Tb_R2<-summary(lm_Tb)$r.squared
+    lm_Tb_rmsd<-sqrt(mean(((correl2$Tb_obs-correl2$Tb_pred)^2),na.rm=TRUE))
+    #text(11,40,paste("r2=",round(lm_Tb_R2,2),"\n","rmsd=",round(lm_Tb_rmsd,2),sep=""))
+    act.obs<-ifelse(correl2$steps>threshold.act,1,0)
+    act.pred<-ifelse(correl2$act>0,1,0)
+    #confus<-confusion(act.pred,act.obs)
+    confus<-confusion(act.obs,act.pred)
+    
+    error<-attributes(confus)
+    confusion<-as.data.frame(t(as.data.frame(c(confus[1:4],error$error))))
+    rownames(confusion)<-NULL
+    colnames(confusion)<-c('true-','false-','true+','false+','err')
+    
+    act.obs.day<-ifelse(correl2.day$steps>threshold.act,1,0)
+    act.pred.day<-ifelse(correl2.day$act>0,1,0)
+    #confus.day<-confusion(act.pred.day,act.obs.day)
+    confus.day<-confusion(act.obs.day,act.pred.day)
+    
+    error.day<-attributes(confus.day)
+    confusion.day<-as.data.frame(t(as.data.frame(c(confus.day[1:4],error.day$error))))
+    rownames(confusion.day)<-NULL
+    colnames(confusion.day)<-c('true-','false-','true+','false+','err')
+    
+    
+    #sleepy$date_waddle<-as.POSIXct(as.numeric(date_waddle[,2]+9.5*60*60),tz=tzone,origin="1970-01-01")
+    plotlizard_forage <- subset(sleepy,  subset=(Steps>threshold.act))
+    plotlizard_noforage <- subset(sleepy,  subset=(Steps>=0))
+ 
+    startdy<-240
+    finishdy<-365
+    
+    with(plotlizard_noforage, {plot(Hours+1~doy, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "",ylab = "",cex=1,pch=15,col='white')})
+    mtext(text="hour of day",side=2, padj=-3)
+    mtext(text="day of year",side=1, padj=3)
+
+    with(plotenviron_night, {points(TIME+2~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=0.5,col="dark grey",pch=16)})
+    
+    rbPal <- colorRampPalette(c('turquoise','gold1'))
+    
+    #This adds a column of color values
+    # based on the y values
+    Tbs<-t(as.numeric(as.matrix(c(plotenviron_bask$TC,plotlizard_forage$Temperature))))
+    Tbs<-as.data.frame(t(Tbs))
+    colnames(Tbs)<-'Tb'
+    
+    Tbs$Col<-rbPal(23)[as.numeric(cut(Tbs$Tb, breaks=seq(18, 37,1), include.lowest=TRUE))]
+    Tbs$Col<-rbPal(23)[as.numeric(cut(Tbs$Tb, breaks=seq(18, 37,1), include.lowest=TRUE))]
+    plotenviron_bask$Col<-Tbs[1:nrow(plotenviron_bask),2]
+    plotenviron_bask$Col <- rbPal(10)[as.numeric(cut(plotenviron_bask$TC,breaks = 10))]
+    #with(plotenviron_forage, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col=plotenviron_bask$Col,pch=15)})
+    with(plotenviron_bask, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col="light blue",pch=15)})
+    with(plotenviron_forage, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col="gold",pch=15)})
+    with(plotlizard_forage, {points(Hours+1~doy, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=log(plotlizard_forage$Steps/300),pch=15,col=addTrans("red",100))}) #col="#0000FF96" #0000FFFF
+    with(desic, {points(desic~day, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",lwd=2,pch=15,col='blue',type='l',lty=2)})
+    with(plotrainfall2, {points(RAINFALL~JULDAY, type = "h",col='blue')})
+    
+    
+    
+    
+    daystart<-paste(substr(curyear,3,4),'/08/28',sep="") # y/m/d
+    dayfin<-paste(substr(curyear,3,4),'/12/31',sep="") # y/m/d
+    #daystart<-paste(substr(curyear,3,4),'/10/15',sep="") # y/m/d
+    #dayfin<-paste(substr(curyear,3,4),'/10/30',sep="") # y/m/d
+    plotlizard<-subset(sleepy, format(sleepy$date_waddle, "%y/%m/%d")>= daystart & format(sleepy$date_waddle, "%y/%m/%d")<=dayfin)
+    plotlizard <- plotlizard[order(plotlizard$date_waddle),] 
+    #plotlizard$date_waddle<-plotlizard$date_waddle-60*60*8
+    plotpred<-subset(plotenviron5, format(plotenviron5$dates, "%y/%m/%d")>= daystart & format(plotenviron5$dates, "%y/%m/%d")<=dayfin)
+    plotdeb<-subset(debout, format(debout$dates, "%y/%m/%d")>= daystart & format(environ$dates, "%y/%m/%d")<=dayfin)
+    plotmetout<-subset(metout, format(metout$dates, "%y/%m/%d")>= daystart & format(metout$dates, "%y/%m/%d")<=dayfin)
+    with(plotpred, {plot(TC~dates,type = "l",ylim=c(0,45),ylab="",xlab="")})
+    mtext(text="body temperature (deg C)",side=2, padj=-3)
+    mtext(text="date",side=1, padj=3)
+    #with(plotmetout, {points(TAREF~dates,type = "l",col='grey')})
+    plotlizard2<-plotlizard
+    colnames(plotlizard2)[1] <- "dates"
+    plotlizard2<-merge(plotlizard2,plotpred,all=TRUE) # merge to avoid continuous line between sample gaps
+    with(plotlizard2, {points(Temperature~dates,type = "l",col=addTrans("red",150))})
+    with(plotdeb, {points(Body_cond~dates,type = "l",col='blue',lty=2,lwd=2)})
+    with(plotrainfall2, {points(RAINFALL~dates, type = "h",col='blue')})
+    with(plotenviron, {points(CONDEP~dates, type = "l",col='light blue')})
+    
+  
 
 
 
