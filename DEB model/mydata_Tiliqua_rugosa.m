@@ -58,7 +58,7 @@ data.ap = data.ab+365*3-data.ab-365*1.5;     units.ap = 'd';    label.ap = 'age 
   temp.ap = T_C + 29.1;  % K, temperature, unused - predict file works it out from Munns data on temperature cycles
   % observed age at puberty is frequently larger than ap, 
   %   because allocation to reproduction starts before first eggs appear
-data.am = 20.9*365;     units.am = 'd';    label.am = 'life span';                   bibkey.am = {'Snid2002'}; % probably an underestimate, Bauer reports 13.6 based on captive records, Kearney, Moritz and Roberts recaptured an individual marked 15 years earlier as an adult at Paynes Find Station   
+data.am = 50*365;     units.am = 'd';    label.am = 'life span';                   bibkey.am = {'Snid2002'}; % 21.9 in Snider 2002, probably an underestimate - have made it 50 years   
   temp.am = T_C + 23.2;  % K, temperature 
 % (accounting for aging only) 
 
@@ -70,14 +70,14 @@ data.Li  = 32.8;   units.Li  = 'cm';   label.Li  = 'ultimate snout to vent lengt
 data.Wdb = 99*0.3; units.Wdb = 'g';    label.Wdb = 'dry weight at birth';              bibkey.Wdb = 'Kear2015'; % Munns data (n=15)
 data.Wdp = 180*0.3;   units.Wdp = 'g';    label.Wdp = 'dry weight at puberty';            bibkey.Wdp = 'Kear2015'; % from Munns observations of length vs. weight, using Lp above
 data.Wdi = 717*0.3;   units.Wdi = 'g';    label.Wdi = 'ultimate dry weight';              bibkey.Wdi = 'Kear2015'; % average post partum mass of Munns animals 2,4,17,20,4,6,10,17,18
-data.Ri  = (1.5+(0.17*1.5))/(2*365);    units.Ri  = '#/d';  label.Ri  = 'maximum reprod rate';              bibkey.Ri  = 'Pamu1997';   % maximum reproduction rate at f (for individual of max length) 1.5 per 3 years but added on 17% afterbirth
+data.Ri  = (1.5+(0.17*1.5))/(2*365);    units.Ri  = '#/d';  label.Ri  = 'maximum reprod rate';              bibkey.Ri  = 'Pamu1997';   % maximum reproduction rate at f (for individual of max length), Munns data suggests 1.5 per 2 years 
   % for an individual of ultimate length Li 
   temp.Ri = T_C +  23.2;  % K, temperature, unused - predict file works it out from Munns data on temperature cycles
  
 % uni-variate data
 
-data.TO = [8.2246	9.0217	9.0942	9.0942	9.6377	9.7101	14.6739	14.7464	14.7826	14.8551	15.0362	15.2536	15.3261	19.4565	19.6377	19.6377	19.6739	19.7101	19.9638	20	20	20.1812	20.3261	20.3623	24.6377	24.6739	24.7464	25	25.0725	25.0725	25.1087	25.1087	25.1449	29.4565	29.6014	29.7101	29.7101	29.8551	29.9638	30	30	30.0725	30.2174	30.2536	30.2536	30.3623	30.5796	34.6739	34.8551	34.8551	35.0725	35.1812	35.2536	35.3623	35.3623	35.4348	35.6522	35.8696	36.3768	39.3841	39.529	39.7826	39.8551	40	40.0362	40.1812	40.8333	41.0507	41.4493;      % ml/h/g, O2 consumption  of 138.3 g dry weight (461 g wet)
-0.00499	0.00605	0.005	0.00803	0.00806	0.00604	0.0131	0.0221	0.0152	0.0202	0.0202	0.0182	0.0132	0.0244	0.0375	0.0426	0.0335	0.0355	0.0386	0.0203	0.0376	0.0285	0.0335	0.0405	0.05	0.0748	0.056	0.085	0.0438	0.0836	0.0492	0.0748	0.0574	0.0914	0.1314	0.0836	0.0852	0.074	0.0965	0.0636	0.0813	0.1049	0.0911	0.0846	0.0958	0.1022	0.0841	0.1511	0.1476	0.083	0.1163	0.1965	0.1273	0.1623	0.1069	0.1707	0.1095	0.1292	0.1305	0.1429	0.1597	0.1498	0.1669	0.1484	0.1608	0.1935	0.233	0.2307	0.1958];
+data.TO = [8.2246	9.0217	9.0942	9.0942	9.6377	9.7101	14.6739	14.7464	14.7826	14.8551	15.0362	15.2536	15.3261	19.4565	19.6377	19.6377	19.6739	19.7101	19.9638	20	20	20.1812	20.3261	20.3623	24.6377	24.6739	24.7464	25	25.0725	25.0725	25.1087	25.1087	25.1449	29.4565	29.6014	29.7101	29.7101	29.8551	29.9638	30	30	30.0725	30.2174	30.2536	30.2536	30.3623	30.5796	34.6739	34.8551	34.8551	35.0725	35.1812	35.2536	35.3623	35.3623	35.4348	35.6522	35.8696	36.3768;	%39.3841	39.529	39.7826	39.8551	40	40.0362	40.1812	40.8333	41.0507	41.4493;      % ml/h/g, O2 consumption  of 138.3 g dry weight (461 g wet)
+0.00499	0.00605	0.005	0.00803	0.00806	0.00604	0.0131	0.0221	0.0152	0.0202	0.0202	0.0182	0.0132	0.0244	0.0375	0.0426	0.0335	0.0355	0.0386	0.0203	0.0376	0.0285	0.0335	0.0405	0.05	0.0748	0.056	0.085	0.0438	0.0836	0.0492	0.0748	0.0574	0.0914	0.1314	0.0836	0.0852	0.074	0.0965	0.0636	0.0813	0.1049	0.0911	0.0846	0.0958	0.1022	0.0841	0.1511	0.1476	0.083	0.1163	0.1965	0.1273	0.1623	0.1069	0.1707	0.1095	0.1292	0.1305]%	%0.1429	0.1597	0.1498	0.1669	0.1484	0.1608	0.1935	0.233	0.2307	0.1958];
 data.TO=transpose(data.TO)
 units.TO = {'C','mlO2/gwet/h'};     label.TO = {'temperature','O2 consumption rate'};  bibkey.TO = 'Wils1974';
 

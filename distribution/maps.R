@@ -42,12 +42,11 @@ P4S <- CRS("+proj=longlat +datum=WGS84")
 sleepy_limit <- readShapeLines(paste(path,"Sleepy_Dist_Limit.shp",sep=""), verbose=TRUE, proj4string=P4S)
 aust_bound<-readShapeLines("C:/Spatial_Data/Australia Vector Data/background/ausborder_polyline.shp", verbose=TRUE, proj4string=P4S)
 
-species<-"Tiliqua rugosa"
-species_dist=occurrences(taxon=species, download_reason_id=10)
-species_dist<-as.data.frame(species_dist$data)
 
 
-order1<-c(13,6,1,2,5,10,18,16,17)
+
+#order1<-c(13,6,1,2,5,10,18,16,17)
+order1<-c(10,2,3,4,5,8,9,6,7)
 pctwets<-c('dam',0,0.1,0.2,1,5,5,15,25)
 filename<-paste("distribution/maps.pdf",sep="") 
 pdf(filename,paper="A4",width=15,height=11) # doing this means you're going to make a pdf - comment this line out if you want to see them in R
@@ -86,13 +85,17 @@ for(i in 1:length(order1)){
   grid <- rasterize(x, gridout, tomap[,var])
   grid <- projectRaster(grid, crs="+proj=longlat +datum=WGS84") # change projection here if needed
   #plot(grid,main=files[order1[i]],zlim=c(0,35),ylim=c(-45,-10),xlim=c(105,155))
-  plot(grid,zlim=c(0,35),ylim=c(-45,-10),xlim=c(105,155),axes=F, box=FALSE,legend=FALSE)
+  plot(grid,zlim=c(0,31),ylim=c(-45,-10),xlim=c(105,155),axes=F, box=FALSE,legend=FALSE)
   #plot(grid,zlim=c(min,max),ylim=c(-45,-10),xlim=c(105,155),axes=F, box=FALSE)
   plot(sleepy_limit, col="black", lwd=1.0,lty=2,add=TRUE)
   plot(aust_bound, col="black", lwd=1.0,add=TRUE)
   if(i==1){
     text(118,-15,"no water")
     text(118,-16.5, "limit")
+    species<-"Tiliqua rugosa"
+    species_dist=occurrences(taxon=species, download_reason_id=10)
+    species_dist<-as.data.frame(species_dist$data)
+    points(species_dist$longitude, species_dist$latitude, col="black", cex=0.2,pch=16)
   }else{
     if(i<7){
       text(118,-15,paste(pctwets[i],"%",sep=""))
@@ -100,7 +103,7 @@ for(i in 1:length(order1)){
       text(118,-15,paste(pctwets[i],"%",sep=""))
     }
   }
-  #  points(species_dist$longitude, species_dist$latitude, col="black", cex=0.2,pch=16)
+  
   
 }
 #  mtext(species,outer = TRUE)

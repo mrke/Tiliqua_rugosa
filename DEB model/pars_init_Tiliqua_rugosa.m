@@ -45,13 +45,13 @@ par.k_J = 0.002;    free.k_J   = 0;    units.k_J = '1/d';      label.k_J = 'k_J'
 par.E_G = 7772;     free.E_G   = 1;    units.E_G = 'J/cm^3';   label.E_G = '[E_G]';    % spec cost for structure
 par.E_Hb = 1.03e+05;    free.E_Hb  = 1;    units.E_Hb = 'J';       label.E_Hb = 'E_Hb';    % maturity at birth
 par.E_Hp = 2.496e+05;      free.E_Hp  = 1;    units.E_Hp = 'J';       label.E_Hp = 'E_Hp';    % maturity at puberty
-par.h_a = 2.85e-10;     free.h_a   = 1;    units.h_a = '1/d^2';    label.h_a = 'h_a';      % Weibull aging acceleration
+par.h_a = 1.85e-11;     free.h_a   = 1;    units.h_a = '1/d^2';    label.h_a = 'h_a';      % Weibull aging acceleration
 par.s_G = 1e-4;     free.s_G   = 0;    units.s_G = '-';        label.s_G = 's_G';      % Gompertz stress coefficient
 
 %% auxiliary parameters
 par.T_A   = 8820;   free.T_A   = 1;    units.T_A = 'K';        label.T_A = 'T_A';      % Arrhenius temperature
-par.T_AL   = 1.827e+04;   free.T_AL   = 1;   units.T_AL = 'K';       label.T_AL = 'T_AL';      % Arrhenius temperature
-par.T_AH   = 2.084e+04;   free.T_AH   = 1;   units.T_AH = 'K';       label.T_AH = 'T_AH';      % Arrhenius temperature
+par.T_AL   = 5e+04;   free.T_AL   = 1;   units.T_AL = 'K';       label.T_AL = 'T_AL';      % Arrhenius temperature
+par.T_AH   = 9e+04;   free.T_AH   = 0;   units.T_AH = 'K';       label.T_AH = 'T_AH';      % Arrhenius temperature
 par.T_L   = T_C+15;   free.T_L   = 0;    units.T_L = 'K';        label.T_L = 'T_L';      % Arrhenius temperature
 par.T_H   = T_C+42;   free.T_H   = 0;    units.T_H = 'K';        label.T_H = 'T_H';      % Arrhenius temperature
 par.del_M = 0.2401; free.del_M = 1;    units.del_M = '-';      label.del_M = 'del_M';  % shape coefficient

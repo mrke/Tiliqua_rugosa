@@ -83,7 +83,7 @@ nocturn<-0 # nocturnal activity allowed (1) or not (0)?
 crepus<-0 # crepuscular activity allowed (1) or not (0)?
 burrow<-1 # shelter in burrow allowed (1) or not (0)?
 shdburrow<-0 #
-mindepth<-4 # minimum depth (soil node) to which animal can retreat if burrowing
+mindepth<-2 # minimum depth (soil node) to which animal can retreat if burrowing
 maxdepth<-10 # maximum depth (soil node) to which animal can retreat if burrowing
 CkGrShad<-1 # shade seeking allowed (1) or not (0)?
 climb<-0 # climbing to seek cooler habitats allowed (1) or not (0)?
@@ -137,7 +137,7 @@ k_J<-debpars[18]/24.
 E_Hb<-debpars[20]*fract^3
 E_Hj<-E_Hb*fract^3
 E_Hp<-debpars[21]*fract^3
-h_aref<-debpars[22]/(24.^2) #3.61e-11/(24.^2) 
+h_aref<-debpars[22]*10^-1/(24.^2) #3.61e-11/(24.^2) 
 s_G<-debpars[23]
 
 E_Egg<-debpars[24]*fract^4# J, initial energy of one egg 
@@ -226,6 +226,7 @@ N_waste<-c(1,4/5,3/5,4/5) # chemical formula for nitrogenous waste product, CHON
 # breeding life history
 clutchsize<-2. # clutch size
 clutch_ab<-c(0.1781,2.7819) # paramters for relationship between length (cm) and clutch size: clutch size = a*SVL-b, make zero if fixed clutch size
+minclutch<-0
 viviparous<-1 # 1=yes, 0=no
 batch<-1 # invoke Pequerie et al.'s batch laying model?
 
@@ -288,16 +289,17 @@ source('NicheMapR_Setup_ecto.R')
 nicheout<-NicheMapR_ecto(niche)
 setwd(maindir)
 # retrieve output
-metout<-as.data.frame(nicheout$metout)[1:(nyears*365*24),]
-shadmet<-as.data.frame(nicheout$shadmet)[1:(nyears*365*24),]
-soil<-as.data.frame(nicheout$soil)[1:(nyears*365*24),]
-shadsoil<-as.data.frame(nicheout$shadsoil)[1:(nyears*365*24),]
+metout<-as.data.frame(nicheout$metout)
+shadmet<-as.data.frame(nicheout$shadmet)
+soil<-as.data.frame(nicheout$soil)
+shadsoil<-as.data.frame(nicheout$shadsoil)
 rainfall<-as.data.frame(nicheout$RAINFALL)
-grassgrowths<-as.data.frame(nicheout$grassgrowths)[1:(nyears*365),]
+grassgrowths<-as.data.frame(nicheout$grassgrowths)
 grasstsdms<-as.data.frame(nicheout$grasstsdms)
-environ<-as.data.frame(nicheout$environ[1:(365*24*nyears),])
-enbal<-as.data.frame(nicheout$enbal[1:(365*24*nyears),])
-masbal<-as.data.frame(nicheout$masbal[1:(365*24*nyears),])
+environ<-as.data.frame(nicheout$environ)
+enbal<-as.data.frame(nicheout$enbal)
+masbal<-as.data.frame(nicheout$masbal)
+humid<-as.data.frame(nicheout$humid)
 
 yearout<-as.data.frame(nicheout$yearout)
 if(nyears>1){
@@ -315,7 +317,7 @@ tzone<-paste("Etc/GMT-",10,sep="") # doing it this way ignores daylight savings!
 dates<-seq(ISOdate(ystart,1,1,tz=tzone)-3600*12, ISOdate((ystart+nyears),1,1,tz=tzone)-3600*13, by="hours")
 dates<-subset(dates, format(dates, "%m/%d")!= "02/29") # remove leap years
 if(DEB==1){
-  debout<-as.data.frame(nicheout$debout[1:(365*24*nyears),])
+  debout<-as.data.frame(nicheout$debout)
   debout<-cbind(dates,debout)
 }
 environ<-cbind(dates,environ)
@@ -391,8 +393,8 @@ addTrans <- function(color,trans)
   return(res)
 }
 
-with(debout, {plot(WETMASS~dates,type = "l",ylab = "wet mass (g)/grass",ylim=c(0,1200))})
-points(grassgrowths*100~dates2,type='l',col='green')
+with(debout, {plot(WETMASS~dates,type = "l",ylab = "wet mass (g)/grass",ylim=c(0,1300),col='grey')})
+#points(grassgrowths*100~dates2,type='l',col='green')
 points(rainfall$rainfall*10~dates2,type='h',col='blue')
 
 with(debout, {plot((WETMASS-WETMASS*(Body_cond/100))~dates,type = "l",xlab = "day of year",ylab = "wet mass (g)",col='blue')})
@@ -757,6 +759,8 @@ for(i in 1:121){
     
     daystart<-paste(substr(curyear,3,4),'/08/28',sep="") # y/m/d
     dayfin<-paste(substr(curyear,3,4),'/12/31',sep="") # y/m/d
+    #daystart<-paste(substr(curyear,3,4),'/09/15',sep="") # y/m/d
+    #dayfin<-paste(substr(curyear,3,4),'/09/30',sep="") # y/m/d
     #daystart<-paste(substr(curyear,3,4),'/10/15',sep="") # y/m/d
     #dayfin<-paste(substr(curyear,3,4),'/10/30',sep="") # y/m/d
     plotlizard<-subset(sleepy, format(sleepy$date_waddle, "%y/%m/%d")>= daystart & format(sleepy$date_waddle, "%y/%m/%d")<=dayfin)
@@ -779,6 +783,7 @@ for(i in 1:121){
     
     #with(plotgrass, {points(growth~dates, type = "l",col='dark green')})
     with(plotdeb,{plot((WETMASS-(CUMREPRO+CUMBATCH)/mu_E*23.9/0.3)~dates,type='l',ylim=c(400,1000),ylab="",xlab="")}) #plot non-reproductive weight
+    #with(plotdeb,{plot(WETMASS~dates,type='l',ylim=c(400,1000),ylab="",xlab="")}) #plot non-reproductive weight
     mtext(text="non-reproductive mass, g",side=2, padj=-3)
     mtext(text="date",side=1, padj=3)
     
@@ -955,7 +960,7 @@ for(i in 1:121){
 allforage_2009<-allforage
 allnoforage_2009<-allnoforage
 allwaddleobs_2009<-allwaddleobs
-allforage_2010<-allforage
+#allforage_2010<-allforage
 
 startdy<-250
 finishdy<-355
@@ -973,8 +978,8 @@ colnames(Tbs)<-'Tb'
 Tbs$Col<-rbPal(23)[as.numeric(cut(Tbs$Tb, breaks=seq(18, 37,1), include.lowest=TRUE))]
 plotenviron_bask$Col<-Tbs[1:nrow(plotenviron_bask),2]
 #plotenviron_bask$Col <- rbPal(10)[as.numeric(cut(plotenviron_bask$TC,breaks = 10))]
-with(plotenviron_bask, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col=plotenviron_bask$Col,pch=15)})
-with(plotenviron_bask, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1,col="gold",pch=15)})
+    with(plotenviron_bask, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col="light blue",pch=15)})
+#    with(plotenviron_forage, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col="gold",pch=15)})
 #with(plotlizard_forage, {points(Hours+1~doy, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=log(plotlizard_forage$Steps/300),pch=15,col=addTrans("red",100))}) #col="#0000FF96" #0000FFFF
 with(desic, {points(desic~day, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",lwd=2,pch=15,col='blue',type='l',lty=2)})
 with(plotrainfall2, {points(RAINFALL~JULDAY, type = "h",col='blue')})
