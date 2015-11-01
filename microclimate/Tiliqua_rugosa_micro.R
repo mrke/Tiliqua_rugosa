@@ -77,7 +77,7 @@ ZH1 <- 0. # Top of (1st) segment, height above surface(m)
 ZH2 <- 0. # 2nd segment, height above surface(m)
 SLE <- 0.96 # Substrate longwave IR emissivity (decimal %), typically close to 1
 ERR <- 1.5 # Integrator error for soil temperature calculations
-DEP <- c(0.,1.5,  3.5, 5.,  10,  15,  30.,  60.,  100.,  200.) # Soil nodes (cm) - keep spacing close near the surface, last value is where it is assumed that the soil temperature is at the annual mean air temperature
+DEP <- c(0., 1.,  3, 5.,  10,  15,  30.,  60.,  100.,  200.) # Soil nodes (cm) - keep spacing close near the surface, last value is where it is assumed that the soil temperature is at the annual mean air temperature
 
 
 if(sitemethod==1){
@@ -208,7 +208,7 @@ CMH2O <- 1. # precipitable cm H2O in air column, 0.1 = VERY DRY; 1.0 = MOIST AIR
 TIMAXS <- c(1.0, 1.0, 0.0, 0.0)   # Time of Maximums for Air Wind RelHum Cloud (h), air & Wind max's relative to solar noon, humidity and cloud cover max's relative to sunrise            											
 TIMINS <- c(0.0, 0.0, 1.0, 1.0)   # Time of Minimums for Air Wind RelHum Cloud (h), air & Wind min's relative to sunrise, humidity and cloud cover min's relative to solar noon
 minshade<-0. # minimum available shade (%)
-maxshade<-40. # maximum available shade (%)
+maxshade<-50. # maximum available shade (%)
 runshade<-1. # run the model twice, once for each shade level (1) or just for the first shade level (0)?
 manualshade<-1 # if using soildata, which includes shade, this will override the data from the database and force max shade to be the number specified above
 Usrhyt <- 3# local height (cm) at which air temperature, relative humidity and wind speed calculatinos will be made 
@@ -227,12 +227,12 @@ maindir<-getwd()
 setwd('/git/micro_australia/')
 niche<-list(writecsv=writecsv,densfun=densfun,L=L,LAI=LAI,SoilMoist_Init=SoilMoist_Init,evenrain=evenrain,runmoist=runmoist,maxpool=maxpool,PE=PE,KS=KS,BB=BB,BD=BD,loop=loop,warm=warm,rainwet=rainwet,manualshade=manualshade,dailywind=dailywind,terrain=terrain,soildata=soildata,loc=loc,ystart=ystart,yfinish=yfinish,nyears=nyears,RUF=RUF,SLE=SLE,ERR=ERR,DEP=DEP,Thcond=Thcond,Density=Density,SpecHeat=SpecHeat,BulkDensity=BulkDensity,Clay=Clay,SatWater=SatWater,SoilMoist=SoilMoist,CMH2O=CMH2O,TIMAXS=TIMAXS,TIMINS=TIMINS,minshade=minshade,maxshade=maxshade,Usrhyt=Usrhyt,REFL=REFL,slope=slope,aspect=aspect,hori=hori,rungads=rungads,cap=cap,write_input=write_input,spatial=spatial,snowmodel=snowmodel,snowtemp=snowtemp,snowdens=snowdens,snowmelt=snowmelt,undercatch=undercatch,rainmelt=rainmelt,rainmult=rainmult,runshade=runshade)
 source('NicheMapR_Setup_micro.R')
-nicheout<-NicheMapR_micro(terrain=terrain,dailywind=dailywind,soildata=soildata,longlat=longlat,sitemethod=sitemethod,timezone=timezone,EC=EC,rainfrac=rainfrac,densfun=densfun,writecsv=writecsv,
-  shore=shore,L=L,LAI=LAI,evenrain=evenrain,runmoist=runmoist,maxpool=maxpool,PE=PE,KS=KS,BB=BB,BD=BD,loc=loc,timeinterval=timeinterval,
-  nyears=nyears,RUF=RUF,SLE=SLE,ERR=ERR,DEP=DEP,Thcond=Thcond,Density=Density,SpecHeat=SpecHeat,BulkDensity=BulkDensity,Clay=Clay,CMH2O=CMH2O,TIMAXS=TIMAXS,
-  TIMINS=TIMINS,minshade=minshade,maxshade=maxshade,Usrhyt=Usrhyt,REFL=REFL,slope=slope,aspect=aspect,hori=hori,rungads=rungads,cap=cap,write_input=write_input,
-  spatial=spatial,snowmodel=snowmodel,snowtemp=snowtemp,snowdens=snowdens,snowmelt=snowmelt,undercatch=undercatch,rainmult=rainmult,rainmelt=rainmelt,
-  runshade=runshade,mac=mac,PCTWET=PCTWET,SoilMoist_Init=SoilMoist_Init,soiltype=soiltype)
+# nicheout<-NicheMapR_micro(terrain=terrain,dailywind=dailywind,soildata=soildata,longlat=longlat,sitemethod=sitemethod,timezone=timezone,EC=EC,rainfrac=rainfrac,densfun=densfun,writecsv=writecsv,
+#   shore=shore,L=L,LAI=LAI,evenrain=evenrain,runmoist=runmoist,maxpool=maxpool,PE=PE,KS=KS,BB=BB,BD=BD,loc=loc,timeinterval=timeinterval,
+#   nyears=nyears,RUF=RUF,SLE=SLE,ERR=ERR,DEP=DEP,Thcond=Thcond,Density=Density,SpecHeat=SpecHeat,BulkDensity=BulkDensity,Clay=Clay,CMH2O=CMH2O,TIMAXS=TIMAXS,
+#   TIMINS=TIMINS,minshade=minshade,maxshade=maxshade,Usrhyt=Usrhyt,REFL=REFL,slope=slope,aspect=aspect,hori=hori,rungads=rungads,cap=cap,write_input=write_input,
+#   spatial=spatial,snowmodel=snowmodel,snowtemp=snowtemp,snowdens=snowdens,snowmelt=snowmelt,undercatch=undercatch,rainmult=rainmult,rainmelt=rainmelt,
+#   runshade=runshade,mac=mac,PCTWET=PCTWET,SoilMoist_Init=SoilMoist_Init,soiltype=soiltype)
 nicheout<-NicheMapR(niche)
 setwd(maindir)
 

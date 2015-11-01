@@ -19,7 +19,7 @@ FLTYPE<-0.0  # fluid type 0.0=air, 1.0=water
 SUBTK<-2.79 # substrate thermal conductivity (W/mC)
 soilnode<-4. # soil node at which eggs are laid (overridden if frogbreed is 1)
 minshade<-0. # minimum available shade (percent)
-maxshade<-40. # maximum available shade (percent)
+maxshade<-50. # maximum available shade (percent)
 REFL<-rep(0.20,timeinterval*nyears) # substrate reflectances 
 
 # morphological traits
@@ -73,17 +73,17 @@ extref<-20. # %, oxygen extraction efficiency (need to check, but based on 35 de
 PFEWAT<-73. # %, fecal water (from Shine's thesis, mixed diet 75% clover, 25% mealworms)
 PTUREA<-0. # %, water in excreted nitrogenous waste
 FoodWater<-82#82 # 82%, water content of food (from Shine's thesis, clover)
-minwater<-8 # %, minimum tolerated dehydration (% of wet mass) - prohibits foraging if greater than this
+minwater<-15 # %, minimum tolerated dehydration (% of wet mass) - prohibits foraging if greater than this
 raindrink<-2.5 # daily rainfall (mm) required for animal to rehydrate from drinking (zero means standing water always available)
-gutfill<-75 # % gut fill at which satiation occurs - if greater than 100%, animal always tries to forage
+gutfill<-75. # % gut fill at which satiation occurs - if greater than 100%, animal always tries to forage
 
 # behavioural traits
 dayact<-1 # diurnal activity allowed (1) or not (0)?
 nocturn<-0 # nocturnal activity allowed (1) or not (0)?
 crepus<-0 # crepuscular activity allowed (1) or not (0)?
 burrow<-1 # shelter in burrow allowed (1) or not (0)?
-shdburrow<-0 #
-mindepth<-2 # minimum depth (soil node) to which animal can retreat if burrowing
+shdburrow<-1 #
+mindepth<-3 # minimum depth (soil node) to which animal can retreat if burrowing
 maxdepth<-10 # maximum depth (soil node) to which animal can retreat if burrowing
 CkGrShad<-1 # shade seeking allowed (1) or not (0)?
 climb<-0 # climbing to seek cooler habitats allowed (1) or not (0)?
@@ -225,7 +225,7 @@ N_waste<-c(1,4/5,3/5,4/5) # chemical formula for nitrogenous waste product, CHON
 
 # breeding life history
 clutchsize<-2. # clutch size
-clutch_ab<-c(0.1781,2.7819) # paramters for relationship between length (cm) and clutch size: clutch size = a*SVL-b, make zero if fixed clutch size
+clutch_ab<-c(0.085,0.7)#c(0.1781,2.7819) # paramters for relationship between length (cm) and clutch size: clutch size = a*SVL-b, make zero if fixed clutch size
 minclutch<-0
 viviparous<-1 # 1=yes, 0=no
 batch<-1 # invoke Pequerie et al.'s batch laying model?
@@ -234,13 +234,13 @@ batch<-1 # invoke Pequerie et al.'s batch laying model?
 breedrainthresh<-0 # rain dependent breeder? 0 means no, otherwise enter rainfall threshold in mm
 # photoperiod response triggering ovulation, none (0), summer solstice (1), autumnal equinox (2),  
 # winter solstice (3), vernal equinox (4), specified daylength thresholds (5)
-photostart<- 3 # photoperiod initiating breeding
+photostart<- 4 # photoperiod initiating breeding
 photofinish<- 1 # photoperiod terminating breeding
 daylengthstart<- 12.5 # threshold daylength for initiating breeding
 daylengthfinish<- 13. # threshold daylength for terminating breeding
 photodirs <- 1 # is the start daylength trigger during a decrease (0) or increase (1) in day length?
 photodirf <- 0 # is the finish daylength trigger during a decrease (0) or increase (1) in day length?
-startday<-1 # make it 90 for T. rugosa loop day of year at which DEB model starts
+startday<-365*6 # make it 90 for T. rugosa loop day of year at which DEB model starts
 breedtempthresh<-200 # body temperature threshold below which breeding will occur
 breedtempcum<-24*7 # cumulative time below temperature threshold for breeding that will trigger breeding
 
@@ -393,20 +393,38 @@ addTrans <- function(color,trans)
   return(res)
 }
 
-with(debout, {plot(WETMASS~dates,type = "l",ylab = "wet mass (g)/grass",ylim=c(0,1300),col='grey')})
+with(debout, {plot(WETMASS~dates,type = "l",ylab = "wet mass (g)/grass",ylim=c(0,1300),col='black')})
 #points(grassgrowths*100~dates2,type='l',col='green')
 points(rainfall$rainfall*10~dates2,type='h',col='blue')
+
+# plot mass and reproduction phenology
+plotdebout<-subset(debout,as.numeric(format(dates, "%Y"))<1994) # use this if you want to subset particular years
+plotdebout<-debout # this just keeps it to all years
+year_vals<-subset(plotdebout,as.character(dates,format='%d/%m')=="01/01")
+year_vals<-subset(year_vals,as.character(year_vals$dates,format='%H')=="00") # get midnight
+plot(plotdebout$WETMASS~plotdebout$dates,type='l', ylab="wet mass, g",xlab="date") # plot wet mass as a function of date
+abline(v=year_vals$dates,col='grey',lty=2) # add lines to show beginning of each year
+plot(debout$CUMBATCH/1000~debout$dates,type='l', ylab='total energy, kJ',xlab="date") # plot energy in batch buffer (yolking eggs)
+points(debout$CUMREPRO/1000~debout$dates,type='l',col='red') # plot energy in the reproduction buffer (captial for egg production, but not currently transformed to eggs)
+abline(v=year_vals$dates,col='grey',lty=2) # add lines to show beginning of each year
+plot(debout$V_baby~debout$dates,type='l', ylab='embryo structure (cm3)',xlab="date") # plot embryo development (volume of structure)
+points(debout$Breeding/10~debout$dates,type='l',col='light blue',lty=1)
+
+# get birthdays
+V_baby2<-debout[1:(nrow(debout)-1),15]-debout[2:(nrow(debout)),15]
+V_baby2[V_baby2>0.1]<-1
+V_baby2[V_baby2!=1]<-0
+V_baby2<-c(V_baby2,0)
+debout$birth<-V_baby2
+format(subset(debout,birth==1)$dates,"%d/%m/%Y")
+
 
 with(debout, {plot((WETMASS-WETMASS*(Body_cond/100))~dates,type = "l",xlab = "day of year",ylab = "wet mass (g)",col='blue')})
 
 with(debout, {points(WETMASS~dates,type = "l",ylab = "wet mass (g)/grass growth")})
 # grass presence vector
-grass<-metout$SOILMOIST3
-grassthresh<-as.single(read.csv('ectoin.csv')[6,2])/2+1
-grass[grass<=grassthresh]<-0
-grass2<-grass
-grass2[grass2>0]<-1
-points(grass*10+600~dates,type='l',col='dark green')
+grass<-as.numeric(grassgrowths[,1])
+points(grass*200+100~dates2,type='l',col='dark green')
 with(rainfall, {points(rainfall*10~dates,type='h',col='dark blue')})
 #  with(environ, {points(CONDEP*30~dates,type='l',col='light blue')})
 
@@ -416,7 +434,6 @@ with(environ, {xyplot(TC+ACT*5+SHADE/10+DEP/10~dates,type = "l")})
 # write.csv(soil,'/NicheMapR_Working/projects/sleepy_ibm_transient/soil.csv')
 # write.csv(shadmet,'/NicheMapR_Working/projects/sleepy_ibm_transient/shadmet.csv')
 # write.csv(shadsoil,'/NicheMapR_Working/projects/sleepy_ibm_transient/shadsoil.csv')
-
 
 ################### analysis and plots ################################
 
@@ -465,14 +482,26 @@ colnames(desic)<-c('day','desic')
 
 with(plotenviron_night, {plot(TIME+2~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=0.5,col=addTrans("dark grey",50),pch=16)})
 with(plotenviron_forage, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col=plotenviron_bask$Col,pch=15)})
-points(grassgrowths[(365*13):(365*14)], type = "l",col='green')
+points(grassgrowths[(365*17):(365*18),1]*10, type = "l",col='green')
 with(desic, {points(desic~day, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",lwd=2,pch=15,col='blue',type='l',lty=2)})
 
 with(plotenviron_night, {plot(TIME+2~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=0.5,col=addTrans("dark grey",50),pch=16)})
 with(plotenviron_bask, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col=plotenviron_bask$Col,pch=15)})
-points(grassgrowths[(365*13):(365*14)], type = "l",col='green')
+points(grassgrowths[(365*17):(365*18),1]*10, type = "l",col='green')
 with(desic, {points(desic~day, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",lwd=2,pch=15,col='blue',type='l',lty=2)})
 
+
+
+dates4<-seq(ISOdate(2009,1,1,tz=tzone)-3600*12, ISOdate(2011,1,1,tz=tzone)-3600*13, by="days") 
+dates4<-subset(dates4, format(dates4, "%m/%d")!= "02/29") # remove leap years
+grassplot<-grassgrowths[(365*18):(365*20),1]*100
+plot(grassplot[1:730]~dates4,ylim=c(0,100),type='l',lwd=2, col='dark green',ylab='plant water content, %',xlab="")
+desic<-subset(debout,TIME==24 & substr(dates,1,4)>=curyear)
+desic<-as.data.frame(cbind(desic[,2],desic[,20]))
+colnames(desic)<-c('day','desic')
+with(desic, {points(desic~dates4,xlab = "day of year",ylab = "hour of day",lwd=2,pch=15,col='cyan',type='l',lty=1)})
+rainf<-rainfall[(365*18):(365*20),2]*1
+points(rainf[1:730]~dates4, type = "h",col='blue')
 
 ################### plot all lizards ################################
 
@@ -714,8 +743,8 @@ for(i in 1:121){
     }
     
     #   
-    if(gutfill>100){
-      filename<-paste("c:/NicheMapR_Working/projects/Sleepy Lizards/plots_alwaysforage/",sleepy_id,"_",sexlizard,"_",curyear,"_nodrink.pdf",sep="") 
+    if(raindrink==0){
+      filename<-paste("waddle test/",sleepy_id,"_",sexlizard,"_",curyear,"_drink.pdf",sep="") 
     }else{
       filename<-paste("waddle test/",sleepy_id,"_",sexlizard,"_",curyear,"_nodrink.pdf",sep="") 
     } 
@@ -877,8 +906,12 @@ if(yeartodo==2009){
 summary2009<-read.csv('waddle test/summary_nodrink_2009_2.csv')
 summary2010<-read.csv('waddle test/summary_nodrink_2010_2.csv')
 
-
-
+summary_all<-rbind(summary2009,summary2010)
+max(summary_all$max_Tb_obs)
+min(summary_all$min_Tb_obs)
+mean(summary_all$Tb_rmsd)
+max(summary_all$Tb_rmsd)
+min(summary_all$Tb_rmsd)
 
 
 ######################### mean activity plots ######################################
@@ -909,7 +942,7 @@ for(i in 1:121){
     write.table(sleepy,file = paste('/NicheMapR_Working/projects/sleepy lizards/waddle/',waddlefiles[i,3],sep=""),row.names=F,sep=",") 
   }
   curyear<-max(sleepy$Year,na.rm=TRUE)
-  if(curyear==2009){
+  if(curyear==2010){
     k<-k+1
     plotrainfall <- subset(rainfall,substr(dates,1,4)==curyear)
     plotenviron_bask <- subset(plotenviron5,  subset=(ACT>=1 & TC>=TBASK & substr(dates,1,4)==curyear))
@@ -960,8 +993,11 @@ for(i in 1:121){
 allforage_2009<-allforage
 allnoforage_2009<-allnoforage
 allwaddleobs_2009<-allwaddleobs
-#allforage_2010<-allforage
-
+allforage_2010<-allforage
+allnoforage_2010<-allnoforage
+allwaddleobs_2010<-allwaddleobs
+all<-rbind(allforage_2009[,1:8],allnoforage_2009,allforage_2010[,1:8],allnoforage_2010)
+describe(all$Temperature)
 startdy<-250
 finishdy<-355
 
@@ -979,7 +1015,7 @@ Tbs$Col<-rbPal(23)[as.numeric(cut(Tbs$Tb, breaks=seq(18, 37,1), include.lowest=T
 plotenviron_bask$Col<-Tbs[1:nrow(plotenviron_bask),2]
 #plotenviron_bask$Col <- rbPal(10)[as.numeric(cut(plotenviron_bask$TC,breaks = 10))]
     with(plotenviron_bask, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col="light blue",pch=15)})
-#    with(plotenviron_forage, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col="gold",pch=15)})
+    with(plotenviron_forage, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col="light blue",pch=15)})
 #with(plotlizard_forage, {points(Hours+1~doy, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=log(plotlizard_forage$Steps/300),pch=15,col=addTrans("red",100))}) #col="#0000FF96" #0000FFFF
 with(desic, {points(desic~day, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",lwd=2,pch=15,col='blue',type='l',lty=2)})
 with(plotrainfall2, {points(RAINFALL~JULDAY, type = "h",col='blue')})
@@ -993,10 +1029,190 @@ meandoy<-aggregate(allforage$doy,by=list(paste(allforage$Year,"_",allforage$Mont
 meanwaddle<-cbind(meanwaddle,meanhour[,2],meandoy[,2])
 colnames(meanwaddle)<-c('date','Steps','Hours','doy')
 #meanwaddle_female<-meanwaddle
-with(meanwaddle, {points(Hours+1~doy, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=log(meanwaddle$Steps/10000+1),pch=15,col=addTrans("red",100))}) #col="#0000FF96" #0000FFFF
+#with(meanwaddle, {points(Hours+1~doy, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=log(meanwaddle$Steps/10000+1),pch=15,col=addTrans("red",100))}) #col="#0000FF96" #0000FFFF
 with(meanwaddle, {points(Hours+1~doy, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=meanwaddle$Steps/25000,pch=15,col=addTrans("red",100))}) #col="#0000FF96" #0000FFFF
 
 
+
+
+
+lizards<-subset(waddlefiles,year==2010)
+
+  #sleepy_id<-waddlefiles[i,2]
+  sleepy_id<-11533
+  sleepy_id<-40044
+  sleepy_id<-11885
+  sexliz<-subset(sex,Liz==sleepy_id)
+  sexliz<-sexliz[2]
+  sexlizard<-as.character(sexliz)
+  if(sexlizard=="u" | sexlizard=="character(0)"){
+    sexlizard<-'unknown'
+  }
+  if(sexlizard==2){
+    sexlizard<-'F'
+  }
+  if(sexlizard==3){
+    sexlizard<-'M'
+  }
+  
+  
+  sleepy<-as.data.frame(read.table(file = paste('/NicheMapR_Working/projects/sleepy lizards/waddle/',sleepy_id,'_2010_ALL.csv',sep=""), sep = ",", head=TRUE))
+ 
+
+  curyear<-max(sleepy$Year,na.rm=TRUE)
+     plotrainfall <- subset(rainfall,substr(dates,1,4)==curyear)
+    plotenviron_bask <- subset(plotenviron5,  subset=(ACT>=1 & TC>=TBASK & substr(dates,1,4)==curyear))
+    plotenviron_forage <- subset(plotenviron5,  subset=(ACT>1 & substr(dates,1,4)==curyear))
+    plotenviron_night<- subset(metout,  subset=(ZEN==90))
+    plotenviron_night$TIME<-plotenviron_night$TIME/60-1
+    date_waddle1<-with(sleepy,ISOdatetime(Year,Month,Day,Hours,Minutes,0))
+    date_waddle<-date_waddle1+60*60 # adjust for Central Time
+    doy<-strptime(format(date_waddle, "%y/%m/%d"), "%y/%m/%d")$yday+1
+    doy2<-strptime(format(plotrainfall$dates, "%y/%m/%d"), "%y/%m/%d")$yday+1
+    sleepy<-cbind(date_waddle,doy,sleepy)
+    plotrainfall2<-cbind(doy2,plotrainfall)
+    #plotgrass<-cbind(doy2,plotgrass)
+    colnames(plotrainfall2)<-c("JULDAY","dates","RAINFALL")
+    desic<-subset(debout,TIME==24 & substr(dates,1,4)==curyear)
+    desic<-as.data.frame(cbind(desic[,2],desic[,20]))
+    colnames(desic)<-c('day','desic')
+    
+    date_waddle<-aggregate(sleepy$date_waddle,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),min)
+    doy<-aggregate(sleepy$doy,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),max)
+    Tb<-aggregate(sleepy$Temperature,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),mean)
+    steps<-aggregate(sleepy$Steps,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),sum)
+    year<-aggregate(sleepy$Year,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),max)
+    month<-aggregate(sleepy$Month,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),max)
+    day<-aggregate(sleepy$Day,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),max)
+    hours<-aggregate(sleepy$Hours,by=list(paste(sleepy$Year,"_",sleepy$Month,"_",sleepy$Day,"_",sleepy$Hours,sep="")),max)
+    sleepy<-as.data.frame(cbind(as.data.frame(date_waddle[,2]),doy[,2],Tb[,2],steps[,2],year[,2],month[,2],day[,2],hours[,2]))
+    
+    colnames(sleepy)<-c('date_waddle','doy','Temperature','Steps','Year','Month','Day','Hours')
+    
+    
+    
+    # round the times to get rid of occasional 1 min addons
+    x<-sleepy$date_waddle
+    r <-  60*60
+    
+    H <- as.integer(format(x, "%H"))
+    M <- as.integer(format(x, "%M"))
+    S <- as.integer(format(x, "%S"))
+    D <- format(x, "%Y-%m-%d")
+    secs <- 3600*H + 60*M + S
+    x<-as.POSIXct(round(secs/r)*r, origin=D)-11*3600
+    sleepy$date_waddle<-x
+    # end rounding times
+    
+    
+    sleepy2<-as.data.frame(as.data.frame(cbind(date_waddle[,2],doy[,2],Tb[,2],steps[,2],year[,2],month[,2],day[,2],hours[,2],date_waddle$Group.1)))
+    colnames(sleepy2)<-c('date_waddle','doy','Temperature','Steps','Year','Month','Day','Hours','merge')
+    
+    
+    sleepy2$Temperature<-as.factor(sleepy$Temperature)
+    
+    
+    #sleepy$date_waddle<-as.POSIXct(as.numeric(date_waddle[,2]+9.5*60*60),tz=tzone,origin="1970-01-01")
+    plotlizard_forage <- subset(sleepy,  subset=(Steps>threshold.act))
+    plotlizard_noforage <- subset(sleepy,  subset=(Steps>=0))
+ 
+    #startdy<-240
+    #finishdy<-365
+    
+    with(plotlizard_noforage, {plot(Hours+1~doy, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "",ylab = "",cex=1,pch=15,col='white')})
+    mtext(text="hour of day",side=2, padj=-3)
+    mtext(text="day of year",side=1, padj=3)
+
+    with(plotenviron_night, {points(TIME+2~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=0.5,col="dark grey",pch=16)})
+    
+    rbPal <- colorRampPalette(c('turquoise','gold1'))
+    
+    #This adds a column of color values
+    # based on the y values
+    Tbs<-t(as.numeric(as.matrix(c(plotenviron_bask$TC,plotlizard_forage$Temperature))))
+    Tbs<-as.data.frame(t(Tbs))
+    colnames(Tbs)<-'Tb'
+    
+    Tbs$Col<-rbPal(23)[as.numeric(cut(Tbs$Tb, breaks=seq(18, 37,1), include.lowest=TRUE))]
+    Tbs$Col<-rbPal(23)[as.numeric(cut(Tbs$Tb, breaks=seq(18, 37,1), include.lowest=TRUE))]
+    plotenviron_bask$Col<-Tbs[1:nrow(plotenviron_bask),2]
+    plotenviron_bask$Col <- rbPal(10)[as.numeric(cut(plotenviron_bask$TC,breaks = 10))]
+    #with(plotenviron_forage, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col=plotenviron_bask$Col,pch=15)})
+    with(plotenviron_bask, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col="light blue",pch=15)})
+    with(plotenviron_forage, {points(TIME~JULDAY, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1.,col="light blue",pch=15)})
+    with(plotlizard_forage, {points(Hours+1~doy, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=log(plotlizard_forage$Steps/300),pch=15,col=addTrans("red",100))}) #col="#0000FF96" #0000FFFF
+    with(desic, {points(desic~day, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",lwd=2,pch=15,col='blue',type='l',lty=2)})
+    with(plotrainfall2, {points(RAINFALL~JULDAY, type = "h",col='blue')})
+    
+    
+    
+    
+    daystart<-paste(substr(curyear,3,4),'/08/28',sep="") # y/m/d
+    dayfin<-paste(substr(curyear,3,4),'/12/31',sep="") # y/m/d
+    #daystart<-paste(substr(curyear,3,4),'/10/15',sep="") # y/m/d
+    #dayfin<-paste(substr(curyear,3,4),'/10/30',sep="") # y/m/d
+    plotlizard<-subset(sleepy, format(sleepy$date_waddle, "%y/%m/%d")>= daystart & format(sleepy$date_waddle, "%y/%m/%d")<=dayfin)
+    plotlizard <- plotlizard[order(plotlizard$date_waddle),] 
+    #plotlizard$date_waddle<-plotlizard$date_waddle-60*60*8
+    plotpred<-subset(plotenviron5, format(plotenviron5$dates, "%y/%m/%d")>= daystart & format(plotenviron5$dates, "%y/%m/%d")<=dayfin)
+    plotdeb<-subset(debout, format(debout$dates, "%y/%m/%d")>= daystart & format(environ$dates, "%y/%m/%d")<=dayfin)
+    plotmetout<-subset(metout, format(metout$dates, "%y/%m/%d")>= daystart & format(metout$dates, "%y/%m/%d")<=dayfin)
+    with(plotpred, {plot(TC~dates,type = "l",ylim=c(0,45),ylab="",xlab="")})
+    mtext(text="body temperature (deg C)",side=2, padj=-3)
+    mtext(text="date",side=1, padj=3)
+    #with(plotmetout, {points(TAREF~dates,type = "l",col='grey')})
+    plotlizard2<-plotlizard
+    colnames(plotlizard2)[1] <- "dates"
+    plotlizard2<-merge(plotlizard2,plotpred,all=TRUE) # merge to avoid continuous line between sample gaps
+    with(plotlizard2, {points(Temperature~dates,type = "l",col=addTrans("red",150))})
+    with(plotdeb, {points(Body_cond~dates,type = "l",col='blue',lty=2,lwd=2)})
+    with(plotrainfall2, {points(RAINFALL~dates, type = "h",col='blue')})
+    with(plotenviron, {points(CONDEP~dates, type = "l",col='light blue')})
+    
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+all<-rbind(allforage[,1:8],allnoforage)
+meanTb_obs<-aggregate(all$Temperature,by=list(paste(all$Year,"_",all$Month,"_",all$Day,"_",all$Hours,sep="")),mean)
+maxTb_obs<-aggregate(all$Temperature,by=list(paste(all$Year,"_",all$Month,"_",all$Day,"_",all$Hours,sep="")),max)
+minTb_obs<-aggregate(all$Temperature,by=list(paste(all$Year,"_",all$Month,"_",all$Day,"_",all$Hours,sep="")),min)
+meanhour<-aggregate(all$Hours,by=list(paste(all$Year,"_",all$Month,"_",all$Day,"_",all$Hours,sep="")),mean)
+meandoy<-aggregate(all$doy,by=list(paste(all$Year,"_",all$Month,"_",all$Day,"_",all$Hours,sep="")),mean)
+meanTb_obs<-cbind(meanTb_obs,maxTb_obs[,2],minTb_obs[,2],meanhour[,2],meandoy[,2])
+colnames(meanTb_obs)<-c('merge','Tb','Tbmax','Tbmin','Hours','doy')
+meanTb_obs$day<-meanTb_obs$doy+meanTb_obs$Hours/24
+meanTb_obs<-meanTb_obs[order(meanTb_obs$day),]
+plotpred$merge<-as.character(plotpred$merge)
+all_merged<-merge(meanTb_obs,plotpred)
+
+
+plotpred$day<-plotpred$JULDAY+plotpred$TIME/24
+plot(plotpred$TC~plotpred$day,type='l',cex=0.5,ylim=c(0,50))
+points(meanTb_obs$Tb~meanTb_obs$day,type='l',col='red',cex=0.5,pch=16)
+points(meanTb_obs$Tbmin~meanTb_obs$day,type='b',col='blue',cex=0.5,pch=16)
+points(meanTb_obs$Tbmax~meanTb_obs$day,type='b',col='orange',cex=0.5,pch=16)
+
+polygon(c(meanTb_obs$day,meanTb_obs$day),c(meanTb_obs$Tbmin,meanTb_obs$Tbmax),col=gray(0.8),border=NA)
+polygon(c(meanTb_obs$day,meanTb_obs$day),c(meanTb_obs$Tbmax,meanTb_obs$Tbmin),col=gray(0.8),border=NA)
 
 startdy<-1
 finishdy<-365
@@ -1194,8 +1410,27 @@ qmplot(x, y, data = longlatcoor, color = class, darken = .6)
 
 al1MAP+ geom_point(data=as.data.frame(longlatcoor), aes(x=x, y=y),colour = "yellow", size = 0.5)
 
+lizards<-subset(waddlefiles,year==2009)
 
-
+  #sleepy_id<-waddlefiles[i,2]
+  sleepy_id<-11129
+  sleepy_id<-12434
+  sexliz<-subset(sex,Liz==sleepy_id)
+  sexliz<-sexliz[2]
+  sexlizard<-as.character(sexliz)
+  if(sexlizard=="u" | sexlizard=="character(0)"){
+    sexlizard<-'unknown'
+  }
+  if(sexlizard==2){
+    sexlizard<-'F'
+  }
+  if(sexlizard==3){
+    sexlizard<-'M'
+  }
+  
+  
+  sleepy<-as.data.frame(read.table(file = paste('/NicheMapR_Working/projects/sleepy lizards/waddle/',sleepy_id,'_2009_ALL.csv',sep=""), sep = ",", head=TRUE))
+ 
 
   curyear<-max(sleepy$Year,na.rm=TRUE)
      plotrainfall <- subset(rainfall,substr(dates,1,4)==curyear)
@@ -1378,6 +1613,8 @@ al1MAP+ geom_point(data=as.data.frame(longlatcoor), aes(x=x, y=y),colour = "yell
 
 
 # ######## comparison with Fig. 5 Kerr 2004 #############
+    #******** start 7 years in ****************
+    
 plotmasbal <- subset(masbal, format(masbal$dates, "%y")=="02"  | format(masbal$dates, "%y")=="03")
 plotdebout <- subset(debout, format(debout$dates, "%y")=="02"  | format(debout$dates, "%y")=="03")
 plotenviron <- subset(environ, format(environ$dates, "%y")=="02"  | format(environ$dates, "%y")=="03")
@@ -1403,20 +1640,30 @@ with(plotenviron_bask, {plot(TIME~DAY, ylim=c(0,25),xlab = "day of year",ylab = 
 startdy<-250
 finishdy<-355
 
+
+juldays<-rep(seq(1,365*nyears,1),24)
+juldays<-juldays[order(juldays)]
+doy1<-seq(1,365*20,1)
+
+DAY<-environ$DAY
+plotenviron_night<-cbind(metout,DAY)
+plotenviron_night<- subset(plotenviron_night,  subset=(ZEN==90))
+
 #with(plotlizard_noforage, {plot(Hours+1~doy, xlim=c(startdy,finishdy),ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=1,pch=15,col='ivory 4')})
-with(plotenviron_night, {points(TIME+2~JULDAY, ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=0.5,col="dark grey",pch=16)})
+with(plotenviron_night, {points(TIME/60+1~DAY, ylim=c(0,25),xlab = "day of year",ylab = "hour of day",cex=0.5,col="dark grey",pch=16)})
 
 doy2<-strptime(format(rainfall$dates, "%y/%m/%d"), "%y/%m/%d")$yday+1
 plotrainfall2<-cbind(doy2,rainfall)
-#plotgrass<-cbind(doy2,plotgrass)
 colnames(plotrainfall2)<-c("JULDAY","dates","RAINFALL")
+with(plotrainfall2, {points(RAINFALL~doy1, type = "h",col='blue')})
+
+#plotgrass<-cbind(doy2,plotgrass)
 desic<-subset(debout,TIME==24 )
 desic<-as.data.frame(cbind(desic[,2],desic[,20]))
 colnames(desic)<-c('day','desic')
 doy2<-as.numeric(rownames(desic))
 
 with(desic, {points(desic~doy2, ylim=c(0,25),xlab = "day of year",ylab = "hour of day",lwd=2,pch=15,col='blue',type='l',lty=2)})
-with(plotrainfall2, {points(RAINFALL~doy2, type = "h",col='blue')})
 
 wetgut<-as.data.frame(((plotdebout$MASS_GUT/mu_E)*23.9)/d_V)
 wetgut<-cbind(plotdebout$dates,wetgut)
@@ -1437,6 +1684,11 @@ with(Kerr_fig5,points(Mass~date_Kerr,type='b',col='red'))
 #female
 with(plotdebout, {plot((WETMASS-WETMASS*(Body_cond/100))~dates,ylim=c(400,750),type = "l",xlab = "day of year",ylab = "wet mass (g)")})
 with(plotdebout, {points(WETMASS~dates,type = "l",col='4',ylim=c(400,650))})
+with(Kerr_fig5,points(Mass~date_Kerr,type='b',col='red'))
+
+#non-gravid female
+with(plotdebout, {plot((WETMASS-WETMASS*(Body_cond/100)-70-(CUMREPRO+CUMBATCH)/mu_E*23.9/d_V)~dates,ylim=c(400,750),type = "l",xlab = "day of year",ylab = "wet mass (g)")})
+with(plotdebout, {points(WETMASS-(CUMREPRO+CUMBATCH)/mu_E*23.9/d_V~dates,type = "l",col='4',ylim=c(400,650))})
 with(Kerr_fig5,points(Mass~date_Kerr,type='b',col='red'))
 
 with(Kerr_fig5,points(Mass~date_Kerr,type='b',col='red'))
@@ -1650,8 +1902,10 @@ text(x = 6.2,y = 42, expression(~ group("",degree,"")))
 text(x= 6.9,y = 42, " C")
 # plot observed and predicted Tb (and Tair) vs time for Sept-Nov
 
-with(correl_all_2009,plot(Tb_obs~Tb_pred,ylim=c(0,50),xlim=c(0,40),main=2009,xlab=expression(paste("Observed Temperature [",degree,"C]")),ylab=expression(paste("Predicted Temperature [",degree,"C]"))))
-abline(0,1,col='red')
+with(correl_all_2009,plot(Tb_pred~Tb_obs,col=addTrans("black",10),pch=16,cex=0.5,ylim=c(5,45),xlim=c(5,45),main="",xlab=expression(paste("Observed Temperature [",degree,"C]")),ylab=expression(paste("Predicted Temperature [",degree,"C]"))))
+abline(0,1,col='black')
+with(correl_all_2010,plot(Tb_pred~Tb_obs,col=addTrans("black",10),pch=16,cex=0.5,ylim=c(5,45),xlim=c(5,45),main="",xlab=expression(paste("Observed Temperature [",degree,"C]")),ylab=expression(paste("Predicted Temperature [",degree,"C]"))))
+abline(0,1,col='black')
 
 yearstodo<-c(2009,2010)
 for(m in 1:2){
