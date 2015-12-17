@@ -233,7 +233,7 @@ source('NicheMapR_Setup_micro.R')
 #   TIMINS=TIMINS,minshade=minshade,maxshade=maxshade,Usrhyt=Usrhyt,REFL=REFL,slope=slope,aspect=aspect,hori=hori,rungads=rungads,cap=cap,write_input=write_input,
 #   spatial=spatial,snowmodel=snowmodel,snowtemp=snowtemp,snowdens=snowdens,snowmelt=snowmelt,undercatch=undercatch,rainmult=rainmult,rainmelt=rainmelt,
 #   runshade=runshade,mac=mac,PCTWET=PCTWET,SoilMoist_Init=SoilMoist_Init,soiltype=soiltype)
-nicheout<-NicheMapR(niche)
+nicheout<-NicheMapR()
 setwd(maindir)
 
 # get output
@@ -252,8 +252,7 @@ MAXSHADES<-as.data.frame(nicheout$MAXSHADES)
 elev<-as.numeric(nicheout$ALTT)
 REFL<-as.numeric(nicheout$REFL)
 longlat<-as.matrix(nicheout$longlat)
-wilting<-0.11 # soil moisture at node 3 that means no food available
-ectoin<-c(elev,REFL,longlat,0,0,ystart,yfinish)
+ectoin<-c(elev,REFL,longlat,ystart,yfinish)
 longlat<-nicheout$longlat
 
 microdir<-'microclimate/Bundey/'

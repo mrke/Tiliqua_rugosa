@@ -106,7 +106,7 @@ conthole<- 0#2.8 # daily loss of height (mm) due to 'hole' in container (e.g. in
 contonly<-1 # just run the container model and quit?
 contwet<-80 # percent wet value for container
 wetmod<-0 # run the wetland model?
-soilmoisture<-1 # run the soil moisture model? (models near-surface soil moisture rather than a pond as a function of field capacity and wilting point)
+soilmoisture<-1 # use microclimate model soil moisture to predict food availabilty?
 
 # which energy budget model to use? 
 DEB<-1 # run the DEB model (1) or just heat balance, using allometric respiration below (0)
@@ -146,7 +146,6 @@ p_Xm<-13290#12420 # J/h.cm2, maximum intake rate when feeding
 p_Am<-v_dotref*E_m
 K<-500#p_Am/p_Xm # half-saturation constant
 X<-11.7#3#11.7 # max food density J/cm2, approximation based on 200 Tetragonia berries per 1m2 (Dubasd and Bull 1990) assuming energy content of Lilly Pilly (http://www.sgapqld.org.au/bush_food_safety.pdf)
-wilting<-0.11
 
 # for insect model
 metab_mode<-0 # 0 = off, 1 = hemimetabolus model (to do), 2 = holometabolous model
@@ -240,7 +239,7 @@ daylengthstart<- 12.5 # threshold daylength for initiating breeding
 daylengthfinish<- 13. # threshold daylength for terminating breeding
 photodirs <- 1 # is the start daylength trigger during a decrease (0) or increase (1) in day length?
 photodirf <- 0 # is the finish daylength trigger during a decrease (0) or increase (1) in day length?
-startday<-365*6 # make it 90 for T. rugosa loop day of year at which DEB model starts
+startday<-1#365*6 # make it 90 for T. rugosa loop day of year at which DEB model starts
 breedtempthresh<-200 # body temperature threshold below which breeding will occur
 breedtempcum<-24*7 # cumulative time below temperature threshold for breeding that will trigger breeding
 
@@ -284,7 +283,7 @@ ystrt<-0 # year to start the simulation (if zero, starts at first year, but if g
 #set up call to NicheMapR function
 maindir<-getwd()
 setwd('../ectotherm/')
-niche<-list(clutch_ab=clutch_ab,wilting=wilting,ystrt=ystrt,soilmoisture=soilmoisture,write_input=write_input,minshade=minshade,maxshade=maxshade,REFL=REFL,nyears=nyears,enberr=enberr,FLTYPE=FLTYPE,SUBTK=SUBTK,soilnode=soilnode,rinsul=rinsul,lometry=lometry,Flshcond=Flshcond,Spheat=Spheat,Andens=Andens,ABSMAX=ABSMAX,ABSMIN=ABSMIN,ptcond=ptcond,ctmax=ctmax,ctmin=ctmin,TMAXPR=TMAXPR,TMINPR=TMINPR,TPREF=TPREF,DELTAR=DELTAR,skinwet=skinwet,extref=extref,dayact=dayact,nocturn=nocturn,crepus=crepus,burrow=burrow,CkGrShad=CkGrShad,climb=climb,fosorial=fosorial,rainact=rainact,actrainthresh=actrainthresh,container=container,conth=conth,contw=contw,rainmult=rainmult,andens_deb=andens_deb,d_V=d_V,d_E=d_E,eggdryfrac=eggdryfrac,mu_X=mu_X,mu_E=mu_E,mu_V=mu_V,mu_P=mu_P,kappa_X_P=kappa_X_P,mu_X=mu_X,mu_E=mu_E,mu_V=mu_V,mu_P=mu_P,nX=nX,nE=nE,nV=nV,nP=nP,N_waste=N_waste,T_REF=T_REF,TA=TA,TAL=TAL,TAH=TAH,TL=TL,TH=TH,z=z,kappa=kappa,kappa_X=kappa_X,p_Mref=p_Mref,v_dotref=v_dotref,E_G=E_G,k_R=k_R,MsM=MsM,delta=delta,h_aref=h_aref,viviparous=viviparous,k_J=k_J,E_Hb=E_Hb,E_Hj=E_Hj,E_Hp=E_Hp,frogbreed=frogbreed,frogstage=frogstage,clutchsize=clutchsize,v_init=v_init,E_init=E_init,E_H_init=E_H_init,batch=batch,breedrainthresh=breedrainthresh,daylengthstart=daylengthstart,daylenghtfinish=daylengthfinish,photodirs=photodirs,photodirf=photodirf,photostart=photostart,photofinish=photofinish,amass=amass,customallom=customallom,E_Egg=E_Egg,PTUREA=PTUREA,PFEWAT=PFEWAT,FoodWater=FoodWater,DEB=DEB,MR_1=MR_1,MR_2=MR_2,MR_3=MR_3,EMISAN=EMISAN,FATOSK=FATOSK,FATOSB=FATOSB,f=f,minwater=minwater,s_G=s_G,K=K,X=X,flyer=flyer,flyspeed=flyspeed,maxdepth=maxdepth,mindepth=mindepth,ctminthresh=ctminthresh,ctkill=ctkill,metab_mode=metab_mode,stages=stages,arrhenius=arrhenius,startday=startday,raindrink=raindrink,reset=reset,gutfill=gutfill,TBASK=TBASK,TEMERGE=TEMERGE,p_Xm=p_Xm,flymetab=flymetab,live=live,continit=continit,wetmod=wetmod,thermal_stages=thermal_stages,behav_stages=behav_stages,water_stages=water_stages,stage=stage,ma=ma,mi=mi,mh=mh,aestivate=aestivate,depress=depress,contype=contype,rainmult=rainmult,conthole=conthole,contonly=contonly,contwet=contwet,microin=microin,mac=mac,grasshade=grasshade,y_EV_l=y_EV_l,S_instar=S_instar,s_j=s_j)
+niche<-list(clutch_ab=clutch_ab,ystrt=ystrt,soilmoisture=soilmoisture,write_input=write_input,minshade=minshade,maxshade=maxshade,REFL=REFL,nyears=nyears,enberr=enberr,FLTYPE=FLTYPE,SUBTK=SUBTK,soilnode=soilnode,rinsul=rinsul,lometry=lometry,Flshcond=Flshcond,Spheat=Spheat,Andens=Andens,ABSMAX=ABSMAX,ABSMIN=ABSMIN,ptcond=ptcond,ctmax=ctmax,ctmin=ctmin,TMAXPR=TMAXPR,TMINPR=TMINPR,TPREF=TPREF,DELTAR=DELTAR,skinwet=skinwet,extref=extref,dayact=dayact,nocturn=nocturn,crepus=crepus,burrow=burrow,CkGrShad=CkGrShad,climb=climb,fosorial=fosorial,rainact=rainact,actrainthresh=actrainthresh,container=container,conth=conth,contw=contw,rainmult=rainmult,andens_deb=andens_deb,d_V=d_V,d_E=d_E,eggdryfrac=eggdryfrac,mu_X=mu_X,mu_E=mu_E,mu_V=mu_V,mu_P=mu_P,kappa_X_P=kappa_X_P,mu_X=mu_X,mu_E=mu_E,mu_V=mu_V,mu_P=mu_P,nX=nX,nE=nE,nV=nV,nP=nP,N_waste=N_waste,T_REF=T_REF,TA=TA,TAL=TAL,TAH=TAH,TL=TL,TH=TH,z=z,kappa=kappa,kappa_X=kappa_X,p_Mref=p_Mref,v_dotref=v_dotref,E_G=E_G,k_R=k_R,MsM=MsM,delta=delta,h_aref=h_aref,viviparous=viviparous,k_J=k_J,E_Hb=E_Hb,E_Hj=E_Hj,E_Hp=E_Hp,frogbreed=frogbreed,frogstage=frogstage,clutchsize=clutchsize,v_init=v_init,E_init=E_init,E_H_init=E_H_init,batch=batch,breedrainthresh=breedrainthresh,daylengthstart=daylengthstart,daylenghtfinish=daylengthfinish,photodirs=photodirs,photodirf=photodirf,photostart=photostart,photofinish=photofinish,amass=amass,customallom=customallom,E_Egg=E_Egg,PTUREA=PTUREA,PFEWAT=PFEWAT,FoodWater=FoodWater,DEB=DEB,MR_1=MR_1,MR_2=MR_2,MR_3=MR_3,EMISAN=EMISAN,FATOSK=FATOSK,FATOSB=FATOSB,f=f,minwater=minwater,s_G=s_G,K=K,X=X,flyer=flyer,flyspeed=flyspeed,maxdepth=maxdepth,mindepth=mindepth,ctminthresh=ctminthresh,ctkill=ctkill,metab_mode=metab_mode,stages=stages,arrhenius=arrhenius,startday=startday,raindrink=raindrink,reset=reset,gutfill=gutfill,TBASK=TBASK,TEMERGE=TEMERGE,p_Xm=p_Xm,flymetab=flymetab,live=live,continit=continit,wetmod=wetmod,thermal_stages=thermal_stages,behav_stages=behav_stages,water_stages=water_stages,stage=stage,ma=ma,mi=mi,mh=mh,aestivate=aestivate,depress=depress,contype=contype,rainmult=rainmult,conthole=conthole,contonly=contonly,contwet=contwet,microin=microin,mac=mac,grasshade=grasshade,y_EV_l=y_EV_l,S_instar=S_instar,s_j=s_j)
 source('NicheMapR_Setup_ecto.R')
 nicheout<-NicheMapR_ecto(niche)
 setwd(maindir)
@@ -1245,15 +1244,16 @@ getEdges <- function(x) {
                 y@Polygons[[1]]@coords
             })
 }
-getEdges(cp)
-
+#getEdges(cp)
 
 library(adehabitatHR)
-activelizards<-c(9532,9372,9364,9363,9310,40044,40012,12847,12434,11885,11505,10509)
-lizards<-activelizards
+library(rgdal)
+########## active lizards ###############
 
-lizards<-subset(waddlefiles,year==2009 & !(id%in%activelizards))
-lizards<-subset(waddlefiles,year==2009)
+
+activelizards<-c(11505,11885,12434,12847,40012,40044,9310,9372)
+
+lizards<-subset(waddlefiles,year==2009 & (id%in%activelizards))
 
 lizards<-lizards$id
 k<-0
@@ -1278,7 +1278,8 @@ for(i in 1:length(lizards)){
   
   sleepy<-as.data.frame(read.table(file = paste('/NicheMapR_Working/projects/sleepy lizards/waddle/',sleepy_id,'_2009_ALL.csv',sep=""), sep = ",", head=TRUE))
   #sleepy<-as.data.frame(read.table(file = paste('/NicheMapR_Working/projects/sleepy lizards/waddle/',waddlefiles[i,3],sep=""), sep = ",", head=TRUE))
-  sleepy<-subset(sleepy,Month==11 & Day<20 & Day>12) #  & Day<28 & Day>20 week either side of 21th Nov, when little drought broke
+  sleepy<-subset(sleepy,Month==11 & Day<=20 & Day>=11) #  & Day<28 & Day>20 week either side of 21th Nov, when little drought broke
+  sleepy<-subset(sleepy,Month==11) #  & Day<28 & Day>20 week either side of 21th Nov, when little drought broke
   if(nrow(sleepy)>0){
     # prepare UTM coordinates matrix
     UTMzone<-(floor((longlat[1] + 180)/6) %% 60)
@@ -1312,103 +1313,395 @@ for(i in 1:length(lizards)){
 }
 colnames(allcoords)<-c('id','value','x','y')
 library(ggmap)
-ggplot(data=allcoords,aes(x = x, y = y, group = id))
+#ggplot(data=allcoords,aes(x = x, y = y, group = id))
 
 googlemap = ggmap(get_map(location = c(lon = longlat[1], lat = longlat[2]), zoom = 16, maptype = 'satellite',filename = "ggmapTemp.png"))
-plot(googlemap+ geom_point(data=allcoords, aes(x=x, y=y),colour = factor(allcoords$i), size = 0.5))
-plot(googlemap+ geom_polygon(data = subset(allcoords,id==1), aes(x = x, y = y),color=1,fill="NA")
-  + geom_polygon(data = subset(allcoords,id==2), aes(x = x, y = y),color=2,fill="NA")
-  + geom_polygon(data = subset(allcoords,id==3), aes(x = x, y = y),color=3,fill="NA")
-  + geom_polygon(data = subset(allcoords,id==4), aes(x = x, y = y),color=4,fill="NA")
-  + geom_polygon(data = subset(allcoords,id==5), aes(x = x, y = y),color=5,fill="NA")
-  + geom_polygon(data = subset(allcoords,id==6), aes(x = x, y = y),color=6,fill="NA")
-  + geom_polygon(data = subset(allcoords,id==7), aes(x = x, y = y),color=7,fill="NA")
-  + geom_polygon(data = subset(allcoords,id==8), aes(x = x, y = y),color=8,fill="NA")
-  + geom_polygon(data = subset(allcoords,id==9), aes(x = x, y = y),color=9,fill="NA")
-  + geom_polygon(data = subset(allcoords,id==10), aes(x = x, y = y),color=10,fill="NA")
-  + geom_polygon(data = subset(allcoords,id==11), aes(x = x, y = y),color=11,fill="NA")
-  + geom_polygon(data = subset(allcoords,id==12), aes(x = x, y = y),color=12,fill="NA")
+#plot(googlemap+ geom_point(data=allcoords, aes(x=x, y=y),colour = factor(allcoords$i), size = 0.5))
+plot(googlemap+ geom_polygon(data = subset(allcoords,id==1), aes(x = x, y = y),color=1,fill=addTrans(1,60))
+  + geom_polygon(data = subset(allcoords,id==2), aes(x = x, y = y),color=2,fill=addTrans(2,60))
+  + geom_polygon(data = subset(allcoords,id==3), aes(x = x, y = y),color=3,fill=addTrans(3,60))
+  + geom_polygon(data = subset(allcoords,id==4), aes(x = x, y = y),color=4,fill=addTrans(4,60))
+  + geom_polygon(data = subset(allcoords,id==5), aes(x = x, y = y),color=5,fill=addTrans(5,60))
+  + geom_polygon(data = subset(allcoords,id==6), aes(x = x, y = y),color=6,fill=addTrans(6,60))
+  + geom_polygon(data = subset(allcoords,id==7), aes(x = x, y = y),color=7,fill=addTrans(7,60))
+  + geom_polygon(data = subset(allcoords,id==8), aes(x = x, y = y),color=8,fill=addTrans(8,60))
   )
 
 
-plot(googlemap
-  + geom_polygon(data = subset(allcoords,id==1), aes(x = x, y = y),color=1,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==2), aes(x = x, y = y),color=2,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==3), aes(x = x, y = y),color=3,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==4), aes(x = x, y = y),color=4,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==5), aes(x = x, y = y),color=5,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==6), aes(x = x, y = y),color=6,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==7), aes(x = x, y = y),color=7,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==8), aes(x = x, y = y),color=8,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==9), aes(x = x, y = y),color=9,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==10), aes(x = x, y = y),color=10,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==11), aes(x = x, y = y),color=11,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==12), aes(x = x, y = y),color=12,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==13), aes(x = x, y = y),color=13,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==14), aes(x = x, y = y),color=14,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==15), aes(x = x, y = y),color=15,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==16), aes(x = x, y = y),color=16,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==17), aes(x = x, y = y),color=17,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==18), aes(x = x, y = y),color=18,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==19), aes(x = x, y = y),color=19,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==20), aes(x = x, y = y),color=20,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==21), aes(x = x, y = y),color=21,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==22), aes(x = x, y = y),color=22,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==23), aes(x = x, y = y),color=23,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==24), aes(x = x, y = y),color=24,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==25), aes(x = x, y = y),color=25,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==26), aes(x = x, y = y),color=26,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==27), aes(x = x, y = y),color=27,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==28), aes(x = x, y = y),color=28,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==29), aes(x = x, y = y),color=29,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==30), aes(x = x, y = y),color=30,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==31), aes(x = x, y = y),color=31,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==32), aes(x = x, y = y),color=32,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==33), aes(x = x, y = y),color=33,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==34), aes(x = x, y = y),color=34,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==35), aes(x = x, y = y),color=35,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==36), aes(x = x, y = y),color=36,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==37), aes(x = x, y = y),color=37,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==38), aes(x = x, y = y),color=38,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==39), aes(x = x, y = y),color=39,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==40), aes(x = x, y = y),color=40,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==41), aes(x = x, y = y),color=41,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==42), aes(x = x, y = y),color=42,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==43), aes(x = x, y = y),color=43,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==44), aes(x = x, y = y),color=44,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==45), aes(x = x, y = y),color=45,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==46), aes(x = x, y = y),color=46,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==47), aes(x = x, y = y),color=47,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==48), aes(x = x, y = y),color=48,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==49), aes(x = x, y = y),color=49,fill='NA')
- + geom_polygon(data = subset(allcoords,id==50), aes(x = x, y = y),color=50,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==51), aes(x = x, y = y),color=51,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==52), aes(x = x, y = y),color=52,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==53), aes(x = x, y = y),color=53,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==54), aes(x = x, y = y),color=54,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==55), aes(x = x, y = y),color=55,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==56), aes(x = x, y = y),color=56,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==57), aes(x = x, y = y),color=57,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==58), aes(x = x, y = y),color=58,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==59), aes(x = x, y = y),color=59,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==60), aes(x = x, y = y),color=60,fill='NA')
-  + geom_polygon(data = subset(allcoords,id==61), aes(x = x, y = y),color=61,fill='NA')
+########## inactive lizards ###############
+
+lizards<-subset(waddlefiles,year==2009 & !(id%in%activelizards))
+
+lizards<-lizards$id
+k<-0
+for(i in 1:length(lizards)){
+  #i<-9# 32 or 9 
+  
+  #sleepy_id<-waddlefiles[i,2]
+  sleepy_id<-lizards[i]
+  sexliz<-subset(sex,Liz==sleepy_id)
+  sexliz<-sexliz[2]
+  sexlizard<-as.character(sexliz)
+  if(sexlizard=="u" | sexlizard=="character(0)"){
+    sexlizard<-'unknown'
+  }
+  if(sexlizard==2){
+    sexlizard<-'F'
+  }
+  if(sexlizard==3){
+    sexlizard<-'M'
+  }
+  
+  
+  sleepy<-as.data.frame(read.table(file = paste('/NicheMapR_Working/projects/sleepy lizards/waddle/',sleepy_id,'_2009_ALL.csv',sep=""), sep = ",", head=TRUE))
+  #sleepy<-as.data.frame(read.table(file = paste('/NicheMapR_Working/projects/sleepy lizards/waddle/',waddlefiles[i,3],sep=""), sep = ",", head=TRUE))
+  #sleepy<-subset(sleepy,Month==11 & Day<=20 & Day>=11) #  & Day<28 & Day>20 week either side of 21th Nov, when little drought broke
+  sleepy<-subset(sleepy,Month==11) #  & Day<28 & Day>20 week either side of 21th Nov, when little drought broke
+  if(nrow(sleepy)>0){
+    # prepare UTM coordinates matrix
+    UTMzone<-(floor((longlat[1] + 180)/6) %% 60)
+    xy<-na.omit(as.data.frame(cbind(sleepy$Easting,sleepy$Northing)))
+    if(nrow(xy)>4){
+      k=k+1
+      xy<-xy[xy[,1]>0,]
+      if(nrow(xy)>4){
+        utmcoor<-SpatialPoints(xy, proj4string=CRS(paste("+proj=utm +south +zone=",54,sep="")))
+        #utmdata$X and utmdata$Y are corresponding to UTM Easting and Northing, respectively.
+        #zone= UTM zone
+        # converting
+        longlats<-spTransform(utmcoor,CRS("+proj=longlat"))
+        cp <- mcp(longlats, percent=95)
+        cp<-SpatialPolygons(cp@polygons)
+        cp<-as.data.frame(getEdges(cp))
+        colnames(cp)<-c("x","y")
+        longlatcoor<-as.data.frame(longlats)
+        #plot(googlemap+ geom_point(data=longlatcoor, aes(x=x, y=y),colour = i, size = 0.5))
+        # plot(googlemap + geom_polygon(data = cp, aes(x = x, y = y),color=i,fill="NA"))
+        
+        if(k==1){
+          allcoords<-cbind(i,sleepy_id,cp)
+        }else{
+          allcoords<-rbind(allcoords,cbind(i,sleepy_id,cp))
+        }
+      }
+    }
+  }
+  
+}
+colnames(allcoords)<-c('id','value','x','y')
+
+plot(googlemap+ geom_polygon(data = subset(allcoords,id==1), aes(x = x, y = y),color=1,fill=addTrans(1,60))
+  + geom_polygon(data = subset(allcoords,id==2), aes(x = x, y = y),color=2,fill=addTrans(2,60))
+  + geom_polygon(data = subset(allcoords,id==3), aes(x = x, y = y),color=3,fill=addTrans(3,60))
+  + geom_polygon(data = subset(allcoords,id==4), aes(x = x, y = y),color=4,fill=addTrans(4,60))
+  + geom_polygon(data = subset(allcoords,id==5), aes(x = x, y = y),color=5,fill=addTrans(5,60))
+  + geom_polygon(data = subset(allcoords,id==6), aes(x = x, y = y),color=6,fill=addTrans(6,60))
+  + geom_polygon(data = subset(allcoords,id==7), aes(x = x, y = y),color=7,fill=addTrans(7,60))
+  + geom_polygon(data = subset(allcoords,id==8), aes(x = x, y = y),color=8,fill=addTrans(8,60))
++ geom_polygon(data = subset(allcoords,id==9), aes(x = x, y = y),color=9,fill=addTrans(9,60))
++ geom_polygon(data = subset(allcoords,id==10), aes(x = x, y = y),color=10,fill=addTrans(10,60))
++ geom_polygon(data = subset(allcoords,id==11), aes(x = x, y = y),color=11,fill=addTrans(11,60))
++ geom_polygon(data = subset(allcoords,id==12), aes(x = x, y = y),color=12,fill=addTrans(12,60))
++ geom_polygon(data = subset(allcoords,id==13), aes(x = x, y = y),color=13,fill=addTrans(13,60))
++ geom_polygon(data = subset(allcoords,id==14), aes(x = x, y = y),color=14,fill=addTrans(14,60))
++ geom_polygon(data = subset(allcoords,id==15), aes(x = x, y = y),color=15,fill=addTrans(15,60))
++ geom_polygon(data = subset(allcoords,id==16), aes(x = x, y = y),color=16,fill=addTrans(16,60))
++ geom_polygon(data = subset(allcoords,id==17), aes(x = x, y = y),color=17,fill=addTrans(17,60))
++ geom_polygon(data = subset(allcoords,id==18), aes(x = x, y = y),color=18,fill=addTrans(18,60))
++ geom_polygon(data = subset(allcoords,id==19), aes(x = x, y = y),color=19,fill=addTrans(19,60))
++ geom_polygon(data = subset(allcoords,id==20), aes(x = x, y = y),color=20,fill=addTrans(20,60))
++ geom_polygon(data = subset(allcoords,id==21), aes(x = x, y = y),color=21,fill=addTrans(21,60))
++ geom_polygon(data = subset(allcoords,id==22), aes(x = x, y = y),color=22,fill=addTrans(22,60))
++ geom_polygon(data = subset(allcoords,id==23), aes(x = x, y = y),color=23,fill=addTrans(23,60))
++ geom_polygon(data = subset(allcoords,id==24), aes(x = x, y = y),color=24,fill=addTrans(24,60))
++ geom_polygon(data = subset(allcoords,id==25), aes(x = x, y = y),color=25,fill=addTrans(25,60))
++ geom_polygon(data = subset(allcoords,id==26), aes(x = x, y = y),color=26,fill=addTrans(26,60))
++ geom_polygon(data = subset(allcoords,id==27), aes(x = x, y = y),color=27,fill=addTrans(27,60))
++ geom_polygon(data = subset(allcoords,id==28), aes(x = x, y = y),color=28,fill=addTrans(28,60))
++ geom_polygon(data = subset(allcoords,id==29), aes(x = x, y = y),color=29,fill=addTrans(29,60))
++ geom_polygon(data = subset(allcoords,id==30), aes(x = x, y = y),color=30,fill=addTrans(30,60))
++ geom_polygon(data = subset(allcoords,id==31), aes(x = x, y = y),color=31,fill=addTrans(31,60))
++ geom_polygon(data = subset(allcoords,id==32), aes(x = x, y = y),color=32,fill=addTrans(32,60))
++ geom_polygon(data = subset(allcoords,id==33), aes(x = x, y = y),color=33,fill=addTrans(33,60))
++ geom_polygon(data = subset(allcoords,id==34), aes(x = x, y = y),color=34,fill=addTrans(34,60))
++ geom_polygon(data = subset(allcoords,id==35), aes(x = x, y = y),color=35,fill=addTrans(35,60))
++ geom_polygon(data = subset(allcoords,id==36), aes(x = x, y = y),color=36,fill=addTrans(36,60))
++ geom_polygon(data = subset(allcoords,id==37), aes(x = x, y = y),color=37,fill=addTrans(37,60))
++ geom_polygon(data = subset(allcoords,id==38), aes(x = x, y = y),color=38,fill=addTrans(38,60))
++ geom_polygon(data = subset(allcoords,id==39), aes(x = x, y = y),color=39,fill=addTrans(39,60))
++ geom_polygon(data = subset(allcoords,id==40), aes(x = x, y = y),color=40,fill=addTrans(40,60))
++ geom_polygon(data = subset(allcoords,id==41), aes(x = x, y = y),color=41,fill=addTrans(41,60))
++ geom_polygon(data = subset(allcoords,id==42), aes(x = x, y = y),color=42,fill=addTrans(42,60))
++ geom_polygon(data = subset(allcoords,id==43), aes(x = x, y = y),color=43,fill=addTrans(43,60))
++ geom_polygon(data = subset(allcoords,id==44), aes(x = x, y = y),color=44,fill=addTrans(44,60))
++ geom_polygon(data = subset(allcoords,id==45), aes(x = x, y = y),color=45,fill=addTrans(45,60))
++ geom_polygon(data = subset(allcoords,id==46), aes(x = x, y = y),color=46,fill=addTrans(46,60))
++ geom_polygon(data = subset(allcoords,id==47), aes(x = x, y = y),color=47,fill=addTrans(47,60))
++ geom_polygon(data = subset(allcoords,id==48), aes(x = x, y = y),color=48,fill=addTrans(48,60))
++ geom_polygon(data = subset(allcoords,id==49), aes(x = x, y = y),color=49,fill=addTrans(49,60))
++ geom_polygon(data = subset(allcoords,id==50), aes(x = x, y = y),color=50,fill=addTrans(50,60))
++ geom_polygon(data = subset(allcoords,id==51), aes(x = x, y = y),color=51,fill=addTrans(51,60))
++ geom_polygon(data = subset(allcoords,id==52), aes(x = x, y = y),color=52,fill=addTrans(52,60))
++ geom_polygon(data = subset(allcoords,id==53), aes(x = x, y = y),color=53,fill=addTrans(53,60))
+  )
 
 
+### week after rain ####
 
+lizards<-subset(waddlefiles,year==2009 )
+
+lizards<-lizards$id
+k<-0
+for(i in 1:length(lizards)){
+  #i<-9# 32 or 9 
+  
+  #sleepy_id<-waddlefiles[i,2]
+  sleepy_id<-lizards[i]
+  sexliz<-subset(sex,Liz==sleepy_id)
+  sexliz<-sexliz[2]
+  sexlizard<-as.character(sexliz)
+  if(sexlizard=="u" | sexlizard=="character(0)"){
+    sexlizard<-'unknown'
+  }
+  if(sexlizard==2){
+    sexlizard<-'F'
+  }
+  if(sexlizard==3){
+    sexlizard<-'M'
+  }
+  
+  
+  sleepy<-as.data.frame(read.table(file = paste('/NicheMapR_Working/projects/sleepy lizards/waddle/',sleepy_id,'_2009_ALL.csv',sep=""), sep = ",", head=TRUE))
+  #sleepy<-as.data.frame(read.table(file = paste('/NicheMapR_Working/projects/sleepy lizards/waddle/',waddlefiles[i,3],sep=""), sep = ",", head=TRUE))
+  #sleepy<-subset(sleepy,Month==11 & Day<=20 & Day>=11) #  & Day<28 & Day>20 week either side of 21th Nov, when little drought broke
+  sleepy<-subset(sleepy,Month==11 & Year==2009 & Day<28 & Day>20) #  & Day<28 & Day>20 week either side of 21th Nov, when little drought broke
+  if(nrow(sleepy)>0){
+    # prepare UTM coordinates matrix
+    UTMzone<-(floor((longlat[1] + 180)/6) %% 60)
+    xy<-na.omit(as.data.frame(cbind(sleepy$Easting,sleepy$Northing)))
+    if(nrow(xy)>4){
+      k=k+1
+      xy<-xy[xy[,1]>0,]
+      if(nrow(xy)>4){
+        utmcoor<-SpatialPoints(xy, proj4string=CRS(paste("+proj=utm +south +zone=",54,sep="")))
+        #utmdata$X and utmdata$Y are corresponding to UTM Easting and Northing, respectively.
+        #zone= UTM zone
+        # converting
+        longlats<-spTransform(utmcoor,CRS("+proj=longlat"))
+        cp <- mcp(longlats, percent=95)
+        cp<-SpatialPolygons(cp@polygons)
+        cp<-as.data.frame(getEdges(cp))
+        colnames(cp)<-c("x","y")
+        longlatcoor<-as.data.frame(longlats)
+        #plot(googlemap+ geom_point(data=longlatcoor, aes(x=x, y=y),colour = i, size = 0.5))
+        # plot(googlemap + geom_polygon(data = cp, aes(x = x, y = y),color=i,fill="NA"))
+        
+        if(k==1){
+          allcoords<-cbind(i,sleepy_id,cp)
+        }else{
+          allcoords<-rbind(allcoords,cbind(i,sleepy_id,cp))
+        }
+      }
+    }
+  }
+  
+}
+colnames(allcoords)<-c('id','value','x','y')
+
+plot(googlemap+ geom_polygon(data = subset(allcoords,id==1), aes(x = x, y = y),color=1,fill=addTrans(1,60))
+  + geom_polygon(data = subset(allcoords,id==2), aes(x = x, y = y),color=2,fill=addTrans(2,60))
+  + geom_polygon(data = subset(allcoords,id==3), aes(x = x, y = y),color=3,fill=addTrans(3,60))
+  + geom_polygon(data = subset(allcoords,id==4), aes(x = x, y = y),color=4,fill=addTrans(4,60))
+  + geom_polygon(data = subset(allcoords,id==5), aes(x = x, y = y),color=5,fill=addTrans(5,60))
+  + geom_polygon(data = subset(allcoords,id==6), aes(x = x, y = y),color=6,fill=addTrans(6,60))
+  + geom_polygon(data = subset(allcoords,id==7), aes(x = x, y = y),color=7,fill=addTrans(7,60))
+  + geom_polygon(data = subset(allcoords,id==8), aes(x = x, y = y),color=8,fill=addTrans(8,60))
++ geom_polygon(data = subset(allcoords,id==9), aes(x = x, y = y),color=9,fill=addTrans(9,60))
++ geom_polygon(data = subset(allcoords,id==10), aes(x = x, y = y),color=10,fill=addTrans(10,60))
++ geom_polygon(data = subset(allcoords,id==11), aes(x = x, y = y),color=11,fill=addTrans(11,60))
++ geom_polygon(data = subset(allcoords,id==12), aes(x = x, y = y),color=12,fill=addTrans(12,60))
++ geom_polygon(data = subset(allcoords,id==13), aes(x = x, y = y),color=13,fill=addTrans(13,60))
++ geom_polygon(data = subset(allcoords,id==14), aes(x = x, y = y),color=14,fill=addTrans(14,60))
++ geom_polygon(data = subset(allcoords,id==15), aes(x = x, y = y),color=15,fill=addTrans(15,60))
++ geom_polygon(data = subset(allcoords,id==16), aes(x = x, y = y),color=16,fill=addTrans(16,60))
++ geom_polygon(data = subset(allcoords,id==17), aes(x = x, y = y),color=17,fill=addTrans(17,60))
++ geom_polygon(data = subset(allcoords,id==18), aes(x = x, y = y),color=18,fill=addTrans(18,60))
++ geom_polygon(data = subset(allcoords,id==19), aes(x = x, y = y),color=19,fill=addTrans(19,60))
++ geom_polygon(data = subset(allcoords,id==20), aes(x = x, y = y),color=20,fill=addTrans(20,60))
++ geom_polygon(data = subset(allcoords,id==21), aes(x = x, y = y),color=21,fill=addTrans(21,60))
++ geom_polygon(data = subset(allcoords,id==22), aes(x = x, y = y),color=22,fill=addTrans(22,60))
++ geom_polygon(data = subset(allcoords,id==23), aes(x = x, y = y),color=23,fill=addTrans(23,60))
++ geom_polygon(data = subset(allcoords,id==24), aes(x = x, y = y),color=24,fill=addTrans(24,60))
++ geom_polygon(data = subset(allcoords,id==25), aes(x = x, y = y),color=25,fill=addTrans(25,60))
++ geom_polygon(data = subset(allcoords,id==26), aes(x = x, y = y),color=26,fill=addTrans(26,60))
++ geom_polygon(data = subset(allcoords,id==27), aes(x = x, y = y),color=27,fill=addTrans(27,60))
++ geom_polygon(data = subset(allcoords,id==28), aes(x = x, y = y),color=28,fill=addTrans(28,60))
++ geom_polygon(data = subset(allcoords,id==29), aes(x = x, y = y),color=29,fill=addTrans(29,60))
++ geom_polygon(data = subset(allcoords,id==30), aes(x = x, y = y),color=30,fill=addTrans(30,60))
++ geom_polygon(data = subset(allcoords,id==31), aes(x = x, y = y),color=31,fill=addTrans(31,60))
++ geom_polygon(data = subset(allcoords,id==32), aes(x = x, y = y),color=32,fill=addTrans(32,60))
++ geom_polygon(data = subset(allcoords,id==33), aes(x = x, y = y),color=33,fill=addTrans(33,60))
++ geom_polygon(data = subset(allcoords,id==34), aes(x = x, y = y),color=34,fill=addTrans(34,60))
++ geom_polygon(data = subset(allcoords,id==35), aes(x = x, y = y),color=35,fill=addTrans(35,60))
++ geom_polygon(data = subset(allcoords,id==36), aes(x = x, y = y),color=36,fill=addTrans(36,60))
++ geom_polygon(data = subset(allcoords,id==37), aes(x = x, y = y),color=37,fill=addTrans(37,60))
++ geom_polygon(data = subset(allcoords,id==38), aes(x = x, y = y),color=38,fill=addTrans(38,60))
++ geom_polygon(data = subset(allcoords,id==39), aes(x = x, y = y),color=39,fill=addTrans(39,60))
++ geom_polygon(data = subset(allcoords,id==40), aes(x = x, y = y),color=40,fill=addTrans(40,60))
++ geom_polygon(data = subset(allcoords,id==41), aes(x = x, y = y),color=41,fill=addTrans(41,60))
++ geom_polygon(data = subset(allcoords,id==42), aes(x = x, y = y),color=42,fill=addTrans(42,60))
++ geom_polygon(data = subset(allcoords,id==43), aes(x = x, y = y),color=43,fill=addTrans(43,60))
++ geom_polygon(data = subset(allcoords,id==44), aes(x = x, y = y),color=44,fill=addTrans(44,60))
++ geom_polygon(data = subset(allcoords,id==45), aes(x = x, y = y),color=45,fill=addTrans(45,60))
++ geom_polygon(data = subset(allcoords,id==46), aes(x = x, y = y),color=46,fill=addTrans(46,60))
++ geom_polygon(data = subset(allcoords,id==47), aes(x = x, y = y),color=47,fill=addTrans(47,60))
++ geom_polygon(data = subset(allcoords,id==48), aes(x = x, y = y),color=48,fill=addTrans(48,60))
++ geom_polygon(data = subset(allcoords,id==49), aes(x = x, y = y),color=49,fill=addTrans(49,60))
++ geom_polygon(data = subset(allcoords,id==50), aes(x = x, y = y),color=50,fill=addTrans(50,60))
++ geom_polygon(data = subset(allcoords,id==51), aes(x = x, y = y),color=51,fill=addTrans(51,60))
++ geom_polygon(data = subset(allcoords,id==52), aes(x = x, y = y),color=52,fill=addTrans(52,60))
++ geom_polygon(data = subset(allcoords,id==53), aes(x = x, y = y),color=53,fill=addTrans(53,60))
++ geom_polygon(data = subset(allcoords,id==54), aes(x = x, y = y),color=54,fill=addTrans(54,60))
++ geom_polygon(data = subset(allcoords,id==55), aes(x = x, y = y),color=55,fill=addTrans(55,60))
++ geom_polygon(data = subset(allcoords,id==56), aes(x = x, y = y),color=56,fill=addTrans(56,60))
++ geom_polygon(data = subset(allcoords,id==57), aes(x = x, y = y),color=57,fill=addTrans(57,60))
++ geom_polygon(data = subset(allcoords,id==58), aes(x = x, y = y),color=58,fill=addTrans(58,60))
++ geom_polygon(data = subset(allcoords,id==59), aes(x = x, y = y),color=59,fill=addTrans(59,60))
++ geom_polygon(data = subset(allcoords,id==60), aes(x = x, y = y),color=60,fill=addTrans(60,60))
++ geom_polygon(data = subset(allcoords,id==61), aes(x = x, y = y),color=61,fill=addTrans(61,60))
+  )
+
+
+### week before rain ####
+
+lizards<-subset(waddlefiles,year==2009 )
+
+lizards<-lizards$id
+k<-0
+for(i in 1:length(lizards)){
+  #i<-9# 32 or 9 
+  
+  #sleepy_id<-waddlefiles[i,2]
+  sleepy_id<-lizards[i]
+  sexliz<-subset(sex,Liz==sleepy_id)
+  sexliz<-sexliz[2]
+  sexlizard<-as.character(sexliz)
+  if(sexlizard=="u" | sexlizard=="character(0)"){
+    sexlizard<-'unknown'
+  }
+  if(sexlizard==2){
+    sexlizard<-'F'
+  }
+  if(sexlizard==3){
+    sexlizard<-'M'
+  }
+  
+  
+  sleepy<-as.data.frame(read.table(file = paste('/NicheMapR_Working/projects/sleepy lizards/waddle/',sleepy_id,'_2009_ALL.csv',sep=""), sep = ",", head=TRUE))
+  #sleepy<-as.data.frame(read.table(file = paste('/NicheMapR_Working/projects/sleepy lizards/waddle/',waddlefiles[i,3],sep=""), sep = ",", head=TRUE))
+  #sleepy<-subset(sleepy,Month==11 & Day<=20 & Day>=11) #  & Day<28 & Day>20 week either side of 21th Nov, when little drought broke
+  sleepy<-subset(sleepy,Month==11 & Year==2009 & Day<=19 & Day>10) #  & Day<28 & Day>20 week either side of 21th Nov, when little drought broke
+  if(nrow(sleepy)>0){
+    # prepare UTM coordinates matrix
+    UTMzone<-(floor((longlat[1] + 180)/6) %% 60)
+    xy<-na.omit(as.data.frame(cbind(sleepy$Easting,sleepy$Northing)))
+    if(nrow(xy)>4){
+      k=k+1
+      xy<-xy[xy[,1]>0,]
+      if(nrow(xy)>4){
+        utmcoor<-SpatialPoints(xy, proj4string=CRS(paste("+proj=utm +south +zone=",54,sep="")))
+        #utmdata$X and utmdata$Y are corresponding to UTM Easting and Northing, respectively.
+        #zone= UTM zone
+        # converting
+        longlats<-spTransform(utmcoor,CRS("+proj=longlat"))
+        cp <- mcp(longlats, percent=95)
+        cp<-SpatialPolygons(cp@polygons)
+        cp<-as.data.frame(getEdges(cp))
+        colnames(cp)<-c("x","y")
+        longlatcoor<-as.data.frame(longlats)
+        #plot(googlemap+ geom_point(data=longlatcoor, aes(x=x, y=y),colour = i, size = 0.5))
+        # plot(googlemap + geom_polygon(data = cp, aes(x = x, y = y),color=i,fill="NA"))
+        
+        if(k==1){
+          allcoords<-cbind(i,sleepy_id,cp)
+        }else{
+          allcoords<-rbind(allcoords,cbind(i,sleepy_id,cp))
+        }
+      }
+    }
+  }
+  
+}
+colnames(allcoords)<-c('id','value','x','y')
+
+plot(googlemap+ geom_polygon(data = subset(allcoords,id==1), aes(x = x, y = y),color=1,fill=addTrans(1,60))
+  + geom_polygon(data = subset(allcoords,id==2), aes(x = x, y = y),color=2,fill=addTrans(2,60))
+  + geom_polygon(data = subset(allcoords,id==3), aes(x = x, y = y),color=3,fill=addTrans(3,60))
+  + geom_polygon(data = subset(allcoords,id==4), aes(x = x, y = y),color=4,fill=addTrans(4,60))
+  + geom_polygon(data = subset(allcoords,id==5), aes(x = x, y = y),color=5,fill=addTrans(5,60))
+  + geom_polygon(data = subset(allcoords,id==6), aes(x = x, y = y),color=6,fill=addTrans(6,60))
+  + geom_polygon(data = subset(allcoords,id==7), aes(x = x, y = y),color=7,fill=addTrans(7,60))
+  + geom_polygon(data = subset(allcoords,id==8), aes(x = x, y = y),color=8,fill=addTrans(8,60))
++ geom_polygon(data = subset(allcoords,id==9), aes(x = x, y = y),color=9,fill=addTrans(9,60))
++ geom_polygon(data = subset(allcoords,id==10), aes(x = x, y = y),color=10,fill=addTrans(10,60))
++ geom_polygon(data = subset(allcoords,id==11), aes(x = x, y = y),color=11,fill=addTrans(11,60))
++ geom_polygon(data = subset(allcoords,id==12), aes(x = x, y = y),color=12,fill=addTrans(12,60))
++ geom_polygon(data = subset(allcoords,id==13), aes(x = x, y = y),color=13,fill=addTrans(13,60))
++ geom_polygon(data = subset(allcoords,id==14), aes(x = x, y = y),color=14,fill=addTrans(14,60))
++ geom_polygon(data = subset(allcoords,id==15), aes(x = x, y = y),color=15,fill=addTrans(15,60))
++ geom_polygon(data = subset(allcoords,id==16), aes(x = x, y = y),color=16,fill=addTrans(16,60))
++ geom_polygon(data = subset(allcoords,id==17), aes(x = x, y = y),color=17,fill=addTrans(17,60))
++ geom_polygon(data = subset(allcoords,id==18), aes(x = x, y = y),color=18,fill=addTrans(18,60))
++ geom_polygon(data = subset(allcoords,id==19), aes(x = x, y = y),color=19,fill=addTrans(19,60))
++ geom_polygon(data = subset(allcoords,id==20), aes(x = x, y = y),color=20,fill=addTrans(20,60))
++ geom_polygon(data = subset(allcoords,id==21), aes(x = x, y = y),color=21,fill=addTrans(21,60))
++ geom_polygon(data = subset(allcoords,id==22), aes(x = x, y = y),color=22,fill=addTrans(22,60))
++ geom_polygon(data = subset(allcoords,id==23), aes(x = x, y = y),color=23,fill=addTrans(23,60))
++ geom_polygon(data = subset(allcoords,id==24), aes(x = x, y = y),color=24,fill=addTrans(24,60))
++ geom_polygon(data = subset(allcoords,id==25), aes(x = x, y = y),color=25,fill=addTrans(25,60))
++ geom_polygon(data = subset(allcoords,id==26), aes(x = x, y = y),color=26,fill=addTrans(26,60))
++ geom_polygon(data = subset(allcoords,id==27), aes(x = x, y = y),color=27,fill=addTrans(27,60))
++ geom_polygon(data = subset(allcoords,id==28), aes(x = x, y = y),color=28,fill=addTrans(28,60))
++ geom_polygon(data = subset(allcoords,id==29), aes(x = x, y = y),color=29,fill=addTrans(29,60))
++ geom_polygon(data = subset(allcoords,id==30), aes(x = x, y = y),color=30,fill=addTrans(30,60))
++ geom_polygon(data = subset(allcoords,id==31), aes(x = x, y = y),color=31,fill=addTrans(31,60))
++ geom_polygon(data = subset(allcoords,id==32), aes(x = x, y = y),color=32,fill=addTrans(32,60))
++ geom_polygon(data = subset(allcoords,id==33), aes(x = x, y = y),color=33,fill=addTrans(33,60))
++ geom_polygon(data = subset(allcoords,id==34), aes(x = x, y = y),color=34,fill=addTrans(34,60))
++ geom_polygon(data = subset(allcoords,id==35), aes(x = x, y = y),color=35,fill=addTrans(35,60))
++ geom_polygon(data = subset(allcoords,id==36), aes(x = x, y = y),color=36,fill=addTrans(36,60))
++ geom_polygon(data = subset(allcoords,id==37), aes(x = x, y = y),color=37,fill=addTrans(37,60))
++ geom_polygon(data = subset(allcoords,id==38), aes(x = x, y = y),color=38,fill=addTrans(38,60))
++ geom_polygon(data = subset(allcoords,id==39), aes(x = x, y = y),color=39,fill=addTrans(39,60))
++ geom_polygon(data = subset(allcoords,id==40), aes(x = x, y = y),color=40,fill=addTrans(40,60))
++ geom_polygon(data = subset(allcoords,id==41), aes(x = x, y = y),color=41,fill=addTrans(41,60))
++ geom_polygon(data = subset(allcoords,id==42), aes(x = x, y = y),color=42,fill=addTrans(42,60))
++ geom_polygon(data = subset(allcoords,id==43), aes(x = x, y = y),color=43,fill=addTrans(43,60))
++ geom_polygon(data = subset(allcoords,id==44), aes(x = x, y = y),color=44,fill=addTrans(44,60))
++ geom_polygon(data = subset(allcoords,id==45), aes(x = x, y = y),color=45,fill=addTrans(45,60))
++ geom_polygon(data = subset(allcoords,id==46), aes(x = x, y = y),color=46,fill=addTrans(46,60))
++ geom_polygon(data = subset(allcoords,id==47), aes(x = x, y = y),color=47,fill=addTrans(47,60))
++ geom_polygon(data = subset(allcoords,id==48), aes(x = x, y = y),color=48,fill=addTrans(48,60))
++ geom_polygon(data = subset(allcoords,id==49), aes(x = x, y = y),color=49,fill=addTrans(49,60))
++ geom_polygon(data = subset(allcoords,id==50), aes(x = x, y = y),color=50,fill=addTrans(50,60))
++ geom_polygon(data = subset(allcoords,id==51), aes(x = x, y = y),color=51,fill=addTrans(51,60))
++ geom_polygon(data = subset(allcoords,id==52), aes(x = x, y = y),color=52,fill=addTrans(52,60))
++ geom_polygon(data = subset(allcoords,id==53), aes(x = x, y = y),color=53,fill=addTrans(53,60))
++ geom_polygon(data = subset(allcoords,id==54), aes(x = x, y = y),color=54,fill=addTrans(54,60))
++ geom_polygon(data = subset(allcoords,id==55), aes(x = x, y = y),color=55,fill=addTrans(55,60))
++ geom_polygon(data = subset(allcoords,id==56), aes(x = x, y = y),color=56,fill=addTrans(56,60))
++ geom_polygon(data = subset(allcoords,id==57), aes(x = x, y = y),color=57,fill=addTrans(57,60))
++ geom_polygon(data = subset(allcoords,id==58), aes(x = x, y = y),color=58,fill=addTrans(58,60))
++ geom_polygon(data = subset(allcoords,id==59), aes(x = x, y = y),color=59,fill=addTrans(59,60))
++ geom_polygon(data = subset(allcoords,id==60), aes(x = x, y = y),color=60,fill=addTrans(60,60))
++ geom_polygon(data = subset(allcoords,id==61), aes(x = x, y = y),color=61,fill=addTrans(61,60))
   )
 
 
 
-# eval(parse(text=paste("googlemap + geom_point(data=as.data.frame(longlatcoor), aes(x=x, y=y),colour = 'yellow', size = 0.5)" )))
-plot(googlemap+ geom_polygon(data = allcoords, aes(x = x, y = y),color=factor(allcoords$i),fill="NA",group=i))
 
- paste("+ geom_point(data=as.data.frame(",longlatcoors,"), aes(x=x, y=y),colour = 'yellow', size = 0.5)",sep="")
 
-ggmap(al1)#+ geom_point(data=longlatcoor, aes(x=x, y=y),colour = "yellow", size = 0.5)
-qmplot(x, y, data = longlatcoor, color = class, darken = .6)
 
-al1MAP+ geom_point(data=as.data.frame(longlatcoor), aes(x=x, y=y),colour = "yellow", size = 0.5)
 
 lizards<-subset(waddlefiles,year==2009)
 
@@ -1657,7 +1950,7 @@ plotrainfall2<-cbind(doy2,rainfall)
 colnames(plotrainfall2)<-c("JULDAY","dates","RAINFALL")
 with(plotrainfall2, {points(RAINFALL~doy1, type = "h",col='blue')})
 
-#plotgrass<-cbind(doy2,plotgrass)
+plotgrass<-cbind(doy2,plotgrass)
 desic<-subset(debout,TIME==24 )
 desic<-as.data.frame(cbind(desic[,2],desic[,20]))
 colnames(desic)<-c('day','desic')

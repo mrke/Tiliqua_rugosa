@@ -55,12 +55,13 @@ aust_bound<-readShapeLines("C:/Spatial_Data/Australia Vector Data/background/aus
 
 filename<-paste("distribution/maps.pdf",sep="") 
 pdf(filename,paper="A4r",width=15,height=11) # doing this means you're going to make a pdf - comment this line out if you want to see them in R
-par(mfrow = c(3,4)) # set up for 5 plots in 2 columns
+par(mfrow = c(4,4)) # set up for 5 plots in 2 columns
 par(oma = c(2,2,2,3) + 0.1) # margin spacing stuff
 par(mar=rep(0,4)) # margin spacing stuff 
 par(mgp = c(3,1,0) ) # margin spacing stuff 
+fileorder<-c(11,9,7,12)
 
-for(filenum in 6:4){
+for(filenum in fileorder){
 # dam repro
 data2<-read.csv(paste(path,'raw/',files[filenum],sep=""),head=FALSE)
 cohort<-rep(seq(1,20),20)
@@ -69,6 +70,49 @@ cohort<-rep(cohort,(nrow(data2)/400))
 data2$cohort<-cohort[1:nrow(data2)]
 yearsout.names<-c("n","LONG","LAT","YEAR","MaxStg","MaxWgt","MaxLen","Tmax","Tmin","MinRes","MaxDess","MinShade","MaxShade","MinDep","MaxDep","Bsk","Forage","Dist","Food","Drink","NWaste","Feces","O2","Clutch","Fec","CauseDeath","tLay","tEgg","tStg1","tStg2","tStg3","tStg4","tStg5","tStg6","tStg7","tStg8","mStg1","mStg2","mStg3","mStg4","mStg5","mStg6","mStg7","mStg8","surviv","ovip_surviv","fitness","deathstage","cohort")
 colnames(data2)<-yearsout.names
+data2<-subset(data2,MaxWgt>0)
+
+# age
+var<-4
+ 
+for(i in 1:20){
+  data3<-subset(data2,data2$cohort==i)
+  #data3<-subset(data3,data3$CauseDeath==0)
+  data3$MaxDep<-data3$MaxDep*-1
+  #data3<-subset(data3,data3$CauseDeath==0)
+  data3$longlat<-paste(data3$LONG,data3$LAT,sep="")
+   tomap<-cbind(aggregate(data3[,2:3],by=list(data3$longlat),FUN=max),aggregate(data3[,4:49],by=list(data3$longlat),FUN=max)[,2:45])
+    #tomap<-subset(tomap,tomap$Clutch>0)
+  max<-max(tomap[,var])
+  min<-min(tomap[,var])
+  
+  lat1<-min(tomap[,3])-.025 # min latitude
+  lat2<-max(tomap[,3])+.025 # max latitude
+  lon1<-min(tomap[,2])-.025 # min longitude
+  lon2<-max(tomap[,2])+.025 # max longitude
+  quadwid<-(lon2-lon1)/.6
+  quadlen<-(lat2-lat1)/.6
+  gridout <- raster(ncol=quadwid, nrow=quadlen, xmn=lon1, xmx=lon2, ymn=lat1, ymx=lat2)
+  
+  x<-cbind(tomap$LONG,tomap$LAT) # list of co-ordinates
+  grid <- rasterize(x, gridout, tomap[,var])
+  grid <- projectRaster(grid, crs="+proj=longlat +datum=WGS84") # change projection here if needed
+if(i==1){
+  grids<-grid
+}else{
+  grids<-stack(grids,grid)
+}
+  cat(i,' \n')
+}  
+ 
+# if(filenum==fileorder[1]){
+#  plot(mean(grids),zlim=c(0,21),ylim=c(-45,-10),xlim=c(105,155),axes=F, box=FALSE,legend=TRUE) 
+# }else{
+#  plot(mean(grids),zlim=c(0,21),ylim=c(-45,-10),xlim=c(105,155),axes=F, box=FALSE,legend=FALSE) 
+# }
+
+age<-mean(grids)
+ages<-grids
 
 # repro
 var<-25
@@ -103,7 +147,7 @@ if(i==1){
   cat(i,' \n')
 }  
  
-if(filenum==6){
+if(filenum==fileorder[1]){
  plot(sum(grids)/20,zlim=c(0.1,30),ylim=c(-45,-10),xlim=c(105,155),axes=F, box=FALSE,legend=TRUE) 
 }else{
  plot(sum(grids)/20,zlim=c(0.1,30),ylim=c(-45,-10),xlim=c(105,155),axes=F, box=FALSE,legend=FALSE) 
@@ -147,10 +191,10 @@ if(i==1){
   cat(i,' \n')
 }  
  
-if(filenum==6){
-  plot(sum(grids)/400,zlim=c(0,3000),ylim=c(-45,-10),xlim=c(105,155),axes=F, box=FALSE,legend=TRUE) 
+if(filenum==fileorder[1]){
+  plot(mean(grids/ages),zlim=c(0,4500),ylim=c(-45,-10),xlim=c(105,155),axes=F, box=FALSE,legend=TRUE) 
 }else{
-  plot(sum(grids)/400,zlim=c(0,3000),ylim=c(-45,-10),xlim=c(105,155),axes=F, box=FALSE,legend=FALSE) 
+  plot(mean(grids/ages),zlim=c(0,4500),ylim=c(-45,-10),xlim=c(105,155),axes=F, box=FALSE,legend=FALSE) 
 }
 plot(aust_bound, col="black", lwd=1.0,add=TRUE)  
 #points(species_dist$longitude, species_dist$latitude, col="black", cex=0.2,pch=16)
@@ -189,7 +233,7 @@ if(i==1){
   cat(i,' \n')
 }  
  
-if(filenum==6){
+if(filenum==fileorder[1]){
   plot(sum(grids)/20/1000,zlim=c(.100,1.500),ylim=c(-45,-10),xlim=c(105,155),axes=F, box=FALSE,legend=TRUE) 
 }else{
   plot(sum(grids)/20/1000,zlim=c(.100,1.500),ylim=c(-45,-10),xlim=c(105,155),axes=F, box=FALSE,legend=FALSE) 
@@ -230,7 +274,7 @@ if(i==1){
   cat(i,' \n')
 }  
  
-if(filenum==6){
+if(filenum==fileorder[1]){
  plot(sum(grids)/20/100,zlim=c(0,2),ylim=c(-45,-10),xlim=c(105,155),axes=F, box=FALSE,legend=TRUE) 
 }else{
  plot(sum(grids)/20/100,zlim=c(0,2),ylim=c(-45,-10),xlim=c(105,155),axes=F, box=FALSE,legend=FALSE) 
@@ -289,7 +333,7 @@ if(i==1){
   cat(i,' \n')
 }  
  
-if(filenum==6){
+if(filenum==fileorder[1]){
  plot(sum(grids)/20,zlim=c(0.1,30),ylim=c(-45,-10),xlim=c(105,155),axes=F, box=FALSE,legend=TRUE) 
 }else{
  plot(sum(grids)/20,zlim=c(0.1,30),ylim=c(-45,-10),xlim=c(105,155),axes=F, box=FALSE,legend=TRUE) 

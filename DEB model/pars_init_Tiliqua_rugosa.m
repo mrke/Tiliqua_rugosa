@@ -54,7 +54,7 @@ par.T_AL   = 5e+04;   free.T_AL   = 1;   units.T_AL = 'K';       label.T_AL = 'T
 par.T_AH   = 9e+04;   free.T_AH   = 0;   units.T_AH = 'K';       label.T_AH = 'T_AH';      % Arrhenius temperature
 par.T_L   = T_C+15;   free.T_L   = 0;    units.T_L = 'K';        label.T_L = 'T_L';      % Arrhenius temperature
 par.T_H   = T_C+42;   free.T_H   = 0;    units.T_H = 'K';        label.T_H = 'T_H';      % Arrhenius temperature
-par.del_M = 0.2401; free.del_M = 1;    units.del_M = '-';      label.del_M = 'del_M';  % shape coefficient
+par.del_M = 0.2201; free.del_M = 1;    units.del_M = '-';      label.del_M = 'del_M';  % shape coefficient
 
 % environmental parameters (temperatures are in data)
 par.f = 1.0;        free.f     = 0;    units.f = '-';          label.f = 'f';          % scaled functional response for 0-var data
