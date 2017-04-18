@@ -1,0 +1,358 @@
+---
+title: "Home Ranges"
+author: "Michael Kearney"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Home Ranges}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+ eval = TRUE, tidy.opts=list(width.cutoff=60), tidy=TRUE  
+)
+```
+
+## Overview
+
+Plot home ranges, Figs. 5 & S3 
+
+
+Tbs specific period and individual, average per hour
+
+```{r}
+library(adehabitatHR)
+library(rgdal)
+library(ggmap)
+source('addTrans.R')
+getEdges = function(x) {
+  stopifnot(class(x) == "SpatialPolygons")
+  lapply(x@polygons, function(y) {
+    y@Polygons[[1]]@coords
+  })
+}
+```
+
+## Read in data
+
+```{r}
+waddlefiles <- read.csv("waddleometer/waddle_files_all.csv")
+sex <- read.csv("waddleometer/sex.csv",stringsAsFactors = FALSE)
+
+longlat<-c(139.3109, -33.888) # Bundey Bore study site
+loc<-longlat
+googlemap = ggmap(get_map(location = c(lon = longlat[1], lat = longlat[2]), zoom = 16, maptype = 'satellite',filename = "ggmapTemp.png"))
+
+activelizards <- c(11505,11885,12434,12847,40012,40044,9310,9372)
+```
+
+\newpage
+
+## Inactive lizards during dry spell
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE, fig.width = 8, fig.height = 7}
+
+lizards=subset(waddlefiles,year==2009 & !(id%in%activelizards))
+
+lizards <- lizards$id
+sexvec <- sex[which(sex$Liz %in% lizards),2]
+sexvec[sexvec == "M"] <- "cornflowerblue"
+sexvec[sexvec == "F"] <- "darkorchid1"
+sexvec[sexvec == "u"] <- "grey"
+
+k <- 0
+for(i in 1:length(lizards)){
+  #i=9# 32 or 9 
+  
+  #sleepy_id=waddlefiles[i,2]
+  sleepy_id <- lizards[i]
+  sexliz <- subset(sex,Liz == sleepy_id)
+  sexliz <- sexliz[2]
+  sexlizard <- as.character(sexliz)
+  if(sexlizard== "u" | sexlizard == "character(0)"){
+    sexlizard <- 'unknown'
+  }
+  if(sexlizard==2){
+    sexlizard <- 'F'
+  }
+  if(sexlizard==3){
+    sexlizard <- 'M'
+  }
+  
+  
+  sleepy <- as.data.frame(read.table(file = paste('waddle/',sleepy_id,'_2009_ALL.csv',sep=""), sep = ",", head=TRUE))
+  #sleepy=subset(sleepy, Month == 11)
+  sleepy=subset(sleepy, Month == 11 & Day <= 20 & Day >= 11) #  & Day<28 & Day>20 week either side of 21th Nov, when little drought broke
+  
+  if(nrow(sleepy) > 0){
+    # prepare UTM coordinates matrix
+    UTMzone <- (floor((longlat[1] + 180)/6) %% 60)
+    xy <- na.omit(as.data.frame(cbind(sleepy$Easting,sleepy$Northing)))
+    if(nrow(xy)>4){
+      k <- k+1
+      xy <- xy[xy[,1] > 0,] # remove erroneous negative values
+      if(nrow(xy)>4){
+        utmcoor <- SpatialPoints(xy, proj4string = CRS(paste("+proj=utm +south +zone=",54,sep="")))
+        #utmdata$X and utmdata$Y are corresponding to UTM Easting and Northing, respectively.
+        #zone = UTM zone
+        # converting
+        longlats <- spTransform(utmcoor,CRS("+proj=longlat"))
+        cp  <-  mcp(longlats, percent=95) # compute minimum convex polygon
+        cp <- SpatialPolygons(cp@polygons) # turn into polygons
+        cp <- as.data.frame(getEdges(cp)) # turn into long/lat coordinates
+        cp2  <-  mcp(longlats, percent=1) # compute minimum convex polygon
+        cp2 <- SpatialPolygons(cp2@polygons) # turn into polygons
+        cp2 <- as.data.frame(getEdges(cp2))[1,] # turn into long/lat coordinates        
+        colnames(cp) <- c("x","y")
+        longlatcoor <- as.data.frame(longlats)
+        #plot(googlemap + geom_point(data = longlatcoor, aes(x = V1, y = V2), colour = i, size = 0.5)) # plot points
+        #plot(googlemap + geom_polygon(data = cp, aes(x = V1, y = V2), color = i, fill= "NA")) # plot home range
+        if(k==1){
+          allcoords <- cbind(i, sleepy_id, cp)
+          allcentres <- cbind(i, sleepy_id, cp2) 
+        }else{
+          allcoords <- rbind(allcoords,cbind(i,sleepy_id,cp))
+          allcentres <- rbind(allcentres, cbind(i, sleepy_id, cp2)) 
+        }
+      }
+    }
+  }
+}
+colnames(allcoords)=c('id','value','x','y')
+#ggplot(data=allcoords,aes(x = x, y = y, group = id))
+
+
+#plot(googlemap+ geom_point(data=allcoords, aes(x=x, y=y),colour = factor(allcoords$i), size = 0.5))
+
+# code to add all IDs as labels
+ids <- seq(1,length(lizards))
+g <- googlemap
+for (i in 1:length(ids)) { 
+ addmcp <- paste0("geom_polygon(data = subset(allcoords, id == ", ids[i],"), aes(x = x, y = y), color = 1, fill = addTrans('",sexvec[i],"',100))")
+ g <- g + eval(parse(text=addmcp))
+}
+for (i in 1:length(ids)) { 
+ addlabel <- paste0("annotate('text', label = as.character(allcentres[",i,", 2]), x = allcentres[",i,", 3], y = allcentres[",i,", 4], size = 3, colour = 'white')")
+ g <- g + eval(parse(text=addlabel))
+}
+g
+```
+
+## Active lizards during dry spell
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE, fig.width = 8, fig.height = 7}
+
+lizards <- subset(waddlefiles,year==2009 & (id%in%activelizards))
+
+lizards <- lizards$id
+sexvec <- sex[which(sex$Liz %in% lizards),2]
+sexvec[sexvec == "M"] <- "cornflowerblue"
+sexvec[sexvec == "F"] <- "darkorchid1"
+sexvec[sexvec == "u"] <- "grey"
+
+k <- 0
+for(i in 1:length(lizards)){
+  sleepy_id <- lizards[i]
+  sleepy <- as.data.frame(read.table(file = paste('waddle/',sleepy_id,'_2009_ALL.csv',sep=""), sep = ",", head=TRUE))
+  sleepy=subset(sleepy, Month == 11 & Day <= 20 & Day >= 11) #  & Day<28 & Day>20 week either side of 21th Nov, when little drought broke
+  #sleepy=subset(sleepy, Month == 11)
+  if(nrow(sleepy) > 0){
+    # prepare UTM coordinates matrix
+    UTMzone <- (floor((longlat[1] + 180)/6) %% 60)
+    xy <- na.omit(as.data.frame(cbind(sleepy$Easting,sleepy$Northing)))
+    if(nrow(xy)>4){
+      k <- k+1
+      xy <- xy[xy[,1] > 0,] # remove erroneous negative values
+      if(nrow(xy)>4){
+        utmcoor <- SpatialPoints(xy, proj4string = CRS(paste("+proj=utm +south +zone=",54,sep="")))
+        #utmdata$X and utmdata$Y are corresponding to UTM Easting and Northing, respectively.
+        #zone = UTM zone
+        # converting
+        longlats <- spTransform(utmcoor,CRS("+proj=longlat"))
+        cp  <-  mcp(longlats, percent=95) # compute minimum convex polygon
+        cp <- SpatialPolygons(cp@polygons) # turn into polygons
+        cp <- as.data.frame(getEdges(cp)) # turn into long/lat coordinates
+        cp2  <-  mcp(longlats, percent=1) # compute minimum convex polygon
+        cp2 <- SpatialPolygons(cp2@polygons) # turn into polygons
+        cp2 <- as.data.frame(getEdges(cp2))[1,] # turn into long/lat coordinates        
+        colnames(cp) <- c("x","y")
+        longlatcoor <- as.data.frame(longlats)
+        #plot(googlemap + geom_point(data = longlatcoor, aes(x = V1, y = V2), colour = i, size = 0.5)) # plot points
+        #plot(googlemap + geom_polygon(data = cp, aes(x = V1, y = V2), color = i, fill= "NA")) # plot home range
+        if(k==1){
+          allcoords <- cbind(i, sleepy_id, cp)
+          allcentres <- cbind(i, sleepy_id, cp2) 
+        }else{
+          allcoords <- rbind(allcoords,cbind(i,sleepy_id,cp))
+          allcentres <- rbind(allcentres, cbind(i, sleepy_id, cp2)) 
+        }
+      }
+    }
+  }
+}
+colnames(allcoords)=c('id','value','x','y')
+
+# code to add all IDs as labels
+ids <- seq(1,length(lizards))
+g <- googlemap
+for (i in 1:length(ids)) { 
+ addmcp <- paste0("geom_polygon(data = subset(allcoords, id == ", ids[i],"), aes(x = x, y = y), color = 1, fill = addTrans('",sexvec[i],"',100))")
+ g <- g + eval(parse(text=addmcp))
+}
+for (i in 1:length(ids)) { 
+ addlabel <- paste0("annotate('text', label = as.character(allcentres[",i,", 2]), x = allcentres[",i,", 3], y = allcentres[",i,", 4], size = 3, colour = 'white')")
+ g <- g + eval(parse(text=addlabel))
+}
+g
+
+# ids <- seq(1,length(lizards))
+# g <- googlemap
+# for (i in 1:length(ids)) { 
+#  loop_input <- paste0("geom_polygon(data = subset(allcoords, id == ", ids[i],"), aes(x = x, y = y), color = 1, fill = addTrans('",sexvec[i],"',100))")
+#  g <- g + eval(parse(text=loop_input))
+# }
+# g
+# 
+# # add a particular ID as label
+# id <- 10039
+# g<-g + annotate("text", label = as.character(id), x = allcentres[which(allcentres$sleepy_id == id), 3], y = allcentres[which(allcentres$sleepy_id == id), 4], size = 3, colour = "white")
+```
+
+
+## Week before dry-spell-breaking rain
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE, fig.width = 8, fig.height = 7}
+
+lizards=subset(waddlefiles,year==2009 )
+
+lizards <- lizards$id
+sexvec <- sex[which(sex$Liz %in% lizards),2]
+sexvec[sexvec == "M"] <- "cornflowerblue"
+sexvec[sexvec == "F"] <- "darkorchid1"
+sexvec[sexvec == "u"] <- "grey"
+
+k <- 0
+for(i in 1:length(lizards)){
+  sleepy_id <- lizards[i]
+  sleepy <- as.data.frame(read.table(file = paste('waddle/',sleepy_id,'_2009_ALL.csv',sep=""), sep = ",", head=TRUE))
+  sleepy=subset(sleepy,Month==11 & Year==2009 & Day<=19 & Day>10) #  & Day<28 & Day>20 week either side of 21th Nov, when little drought broke
+  if(nrow(sleepy) > 0){
+    # prepare UTM coordinates matrix
+    UTMzone <- (floor((longlat[1] + 180)/6) %% 60)
+    xy <- na.omit(as.data.frame(cbind(sleepy$Easting,sleepy$Northing)))
+    if(nrow(xy)>4){
+      k <- k+1
+      xy <- xy[xy[,1] > 0,] # remove erroneous negative values
+      if(nrow(xy)>4){
+        utmcoor <- SpatialPoints(xy, proj4string = CRS(paste("+proj=utm +south +zone=",54,sep="")))
+        #utmdata$X and utmdata$Y are corresponding to UTM Easting and Northing, respectively.
+        #zone = UTM zone
+        # converting
+        longlats <- spTransform(utmcoor,CRS("+proj=longlat"))
+        cp  <-  mcp(longlats, percent=95) # compute minimum convex polygon
+        cp <- SpatialPolygons(cp@polygons) # turn into polygons
+        cp <- as.data.frame(getEdges(cp)) # turn into long/lat coordinates
+        cp2  <-  mcp(longlats, percent=1) # compute minimum convex polygon
+        cp2 <- SpatialPolygons(cp2@polygons) # turn into polygons
+        cp2 <- as.data.frame(getEdges(cp2))[1,] # turn into long/lat coordinates        
+        colnames(cp) <- c("x","y")
+        longlatcoor <- as.data.frame(longlats)
+        #plot(googlemap + geom_point(data = longlatcoor, aes(x = V1, y = V2), colour = i, size = 0.5)) # plot points
+        #plot(googlemap + geom_polygon(data = cp, aes(x = V1, y = V2), color = i, fill= "NA")) # plot home range
+        if(k==1){
+          allcoords <- cbind(i, sleepy_id, cp)
+          allcentres <- cbind(i, sleepy_id, cp2) 
+        }else{
+          allcoords <- rbind(allcoords,cbind(i,sleepy_id,cp))
+          allcentres <- rbind(allcentres, cbind(i, sleepy_id, cp2)) 
+        }
+      }
+    }
+  }
+}
+colnames(allcoords)=c('id','value','x','y')
+
+# code to add all IDs as labels
+ids <- seq(1,length(lizards))
+g <- googlemap
+for (i in 1:length(ids)) { 
+ addmcp <- paste0("geom_polygon(data = subset(allcoords, id == ", ids[i],"), aes(x = x, y = y), color = 1, fill = addTrans('",sexvec[i],"',100))")
+ g <- g + eval(parse(text=addmcp))
+}
+for (i in 1:length(ids)) { 
+ addlabel <- paste0("annotate('text', label = as.character(allcentres[",i,", 2]), x = allcentres[",i,", 3], y = allcentres[",i,", 4], size = 3, colour = 'white')")
+ g <- g + eval(parse(text=addlabel))
+}
+g
+```
+
+## Week after dry-spell-breaking rain
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE, fig.width = 8, fig.height = 7}
+
+lizards=subset(waddlefiles,year==2009 )
+
+lizards <- lizards$id
+sexvec <- sex[which(sex$Liz %in% lizards),2]
+sexvec[sexvec == "M"] <- "cornflowerblue"
+sexvec[sexvec == "F"] <- "darkorchid1"
+sexvec[sexvec == "u"] <- "grey"
+
+k <- 0
+for(i in 1:length(lizards)){
+  sleepy_id <- lizards[i]
+  sleepy <- as.data.frame(read.table(file = paste('waddle/',sleepy_id,'_2009_ALL.csv',sep=""), sep = ",", head=TRUE))
+  sleepy=subset(sleepy,Month==11 & Year==2009 & Day<28 & Day>20) #  & Day<28 & Day>20 week either side of 21th Nov, when little drought broke
+  if(nrow(sleepy) > 0){
+    # prepare UTM coordinates matrix
+    UTMzone <- (floor((longlat[1] + 180)/6) %% 60)
+    xy <- na.omit(as.data.frame(cbind(sleepy$Easting,sleepy$Northing)))
+    if(nrow(xy)>4){
+      k <- k+1
+      xy <- xy[xy[,1] > 0,] # remove erroneous negative values
+      if(nrow(xy)>4){
+        utmcoor <- SpatialPoints(xy, proj4string = CRS(paste("+proj=utm +south +zone=",54,sep="")))
+        #utmdata$X and utmdata$Y are corresponding to UTM Easting and Northing, respectively.
+        #zone = UTM zone
+        # converting
+        longlats <- spTransform(utmcoor,CRS("+proj=longlat"))
+        cp  <-  mcp(longlats, percent=95) # compute minimum convex polygon
+        cp <- SpatialPolygons(cp@polygons) # turn into polygons
+        cp <- as.data.frame(getEdges(cp)) # turn into long/lat coordinates
+        cp2  <-  mcp(longlats, percent=1) # compute minimum convex polygon
+        cp2 <- SpatialPolygons(cp2@polygons) # turn into polygons
+        cp2 <- as.data.frame(getEdges(cp2))[1,] # turn into long/lat coordinates        
+        colnames(cp) <- c("x","y")
+        longlatcoor <- as.data.frame(longlats)
+        #plot(googlemap + geom_point(data = longlatcoor, aes(x = V1, y = V2), colour = i, size = 0.5)) # plot points
+        #plot(googlemap + geom_polygon(data = cp, aes(x = V1, y = V2), color = i, fill= "NA")) # plot home range
+        if(k==1){
+          allcoords <- cbind(i, sleepy_id, cp)
+          allcentres <- cbind(i, sleepy_id, cp2) 
+        }else{
+          allcoords <- rbind(allcoords,cbind(i,sleepy_id,cp))
+          allcentres <- rbind(allcentres, cbind(i, sleepy_id, cp2)) 
+        }
+      }
+    }
+  }
+}
+colnames(allcoords)=c('id','value','x','y')
+
+# code to add all IDs as labels
+ids <- seq(1,length(lizards))
+g <- googlemap
+for (i in 1:length(ids)) { 
+ addmcp <- paste0("geom_polygon(data = subset(allcoords, id == ", ids[i],"), aes(x = x, y = y), color = 1, fill = addTrans('",sexvec[i],"',100))")
+ g <- g + eval(parse(text=addmcp))
+}
+for (i in 1:length(ids)) { 
+ addlabel <- paste0("annotate('text', label = as.character(allcentres[",i,", 2]), x = allcentres[",i,", 3], y = allcentres[",i,", 4], size = 3, colour = 'white')")
+ g <- g + eval(parse(text=addlabel))
+}
+g
+```

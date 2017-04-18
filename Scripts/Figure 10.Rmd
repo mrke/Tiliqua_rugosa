@@ -1,0 +1,212 @@
+---
+title: "Create Figure 10 - sample weight and lenght trajectories"
+author: "Michael Kearney"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+classoption: landscape
+vignette: >
+  %\VignetteIndexEntry{Create Figure 10 - sample weight and lenght trajectories}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(
+ eval = TRUE, tidy.opts=list(width.cutoff=60), tidy=TRUE  
+)
+```
+
+## Overview
+
+This document runs a simulation of the full mechanistic sleepy lizard model under the scenario of water-limitation (water only from food and rainfall) and unlimited water (e.g. near a permanently filled dam). It compares the results to observed body mass and length of the 29 most frequently recorded lizards in Mike Bull's long-term mark-recapture study (50 or more records) (Bull 1987; Bull 1995). The starting date and initial conditions are adjusted to best match the trajectories.
+
+## Setup for the microclimate model
+
+First load the necessary packages and functions.
+
+```{r, echo = FALSE}
+library(NicheMapR)
+library(raster)
+library(dismo)
+library(knitr)
+source('addTrans.R') # function for making transparent plots
+source('plot_growth.R')
+source('run_year.R')
+source('simliz.R')
+```
+
+Choose site to simulate.
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+spatial <- "w:/"
+longlat <- c(139.3109, -33.888) # Bundey Bore study site
+loc <- longlat
+```
+
+Specify the years to simulate
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+ystart <- 1971# start year
+yfinish <- 2014# end year
+nyears <- yfinish - ystart + 1# integer, number of years for which to run the microclimate model
+```
+
+Load microclimate data and alter underground humidity to better simulate a wombat burrow.
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+load('microclimate/micro_1971_2015.Rda')
+sat <- WETAIR(db = micro$soil[,3:12])$esat # saturated soil vapour pressure
+vpres_soil <- sat * micro$humid[,3:12] # vapour pressure in soil
+e <- WETAIR(db = micro$metout[,3], rh = micro$metout[,5])$e # ambient vapour pressure (soil surface)
+satmean <- vpres_soil # matrix for weighted mean vapour pressure
+weights <- seq(0, .9, .1) # assume linear weighting, with ambient at surface (i.e. start at 0)
+#plot(weights~micro$DEP)
+satmean <- t(apply(cbind(e, e, e, e, e, e, e, e, e, e), 1, function(x) x * (1 - weights))) + t(apply(vpres_soil, 1, function(x) x * weights)) # get weighted mean vapour pressure
+newRH<-satmean / sat # compute relative humidity
+newRH[newRH > 1] <- 1 # remove RH > 1
+micro$humid[, 3:12] <- newRH # replace values in original soil humidity matrix
+
+sat <- WETAIR(db = micro$shadsoil[, 3:12])$esat # saturated soil vapour pressure
+vpres_soil <- sat * micro$shadhumid[, 3:12] # vapour pressure in soil
+e <- WETAIR(db = micro$shadmet[,3], rh = micro$shadmet[,5])$e # ambient vapour pressure (soil surface)
+satmean <- vpres_soil # matrix for weighted mean vapour pressure
+weights <- seq(0, .9, .1) # assume linear weighting, with ambient at surface (i.e. start at 0)
+satmean <- t(apply(cbind(e, e, e, e, e, e, e, e, e, e), 1, function(x) x * (1 - weights))) + t(apply(vpres_soil, 1, function(x) x * weights)) # get weighted mean vapour pressure
+newRH <- satmean / sat # compute relative humidity
+newRH[newRH > 1] <- 1 # remove RH > 1
+micro$shadhumid[, 3:12] <- newRH # replace values in original soil humidity matrix
+micro$metout[, 10] <- 0
+micro$shadmet[, 10] <- 0
+micro_all <- micro
+```
+
+## Setup for the ectotherm model
+
+Morphology
+
+```{r}
+ABSMAX <- 0.866 # maximum solar absorbtivity (dec %), Christian et al. 1996
+ABSMIN <- 0.866 # minimum solar absorbtivity (dec %), Christian et al. 1996
+EMISAN <- 1 # emissivity
+```
+
+Thermal physiology and behaviour.
+
+```{r, echo = FALSE}
+TEMERGE <- 8.5 # min Tb at which they will attempt to leave retreat, from Kerr and Bull (2004)
+TBASK <- 26 # min Tb at which leaves retreat, from Pamula (1997) Table 3.14
+VTMIN <- 26 # minimum Tb at which activity occurs, from Pamula (1997) Table 3.42
+VTMAX <- 39 # maximum Tb at which activity occurs, from Pamula (1997) Table 3.42
+TPREF <- 33.5 # preferred Tb (will try and regulate to this), from Pamula (1997) Table 3.14
+ctmax <- 39 # critical thermal minimum - set to same as VTmax
+ctmin <- 3.5 # critical thermal maximum, from Bennet and John-Alder (1986)
+maxshades <- micro$MAXSHADES # maximum shade allowed
+mindepth <- 3 # min depth (node, 1-10) allowed
+shdburrow <- 1 # use shady retreats only in hot weather
+```
+
+DEB model settings.
+
+```{r, echo = FALSE}
+# load the estimated DEB pars from the estimation procedure previously run in matlab.
+debpars <- as.data.frame(read.csv('DEB model/DEB_pars_Tiliqua_rugosa.csv', header = FALSE))$V1 # read in DEB pars
+load('feedpars.Rda') # read in feeding parameters from 'Sleepy lizard functional response.Rmd' analysis
+
+# set core parameters
+DEB <- 1
+z <- debpars[8] # zoom factor (cm)
+F_m <- feedpars[2] # max spec searching rate (J/h.cm^2)
+kap_X <- debpars[11] # digestion efficiency of food to reserve (-)
+v <- debpars[13]/24 # energy conductance (cm/h)
+kap <- debpars[14] # kappa, fraction of mobilised reserve to growth/maintenance (-)
+kap_R <- debpars[15] # reproduction efficiency (-)
+p_M <- debpars[16]/24 # specific somatic maintenance (J/cm3)
+k_J <- debpars[18]/24 # maturity maint rate coefficient (1/h)
+E_G <- debpars[19] # specific cost for growth (J/cm3)
+E_Hb <- debpars[20] # maturity at birth (J)
+E_Hp <- debpars[21] # maturity at puberty (J)
+h_a <- debpars[22]*10^-2/(24^2) # Weibull aging acceleration (1/h^2)
+s_G <- debpars[23] # Gompertz stress coefficient (-)
+fract <- 1 # fraction by which zoom factor is changed - genetic difference in size
+
+# set thermal respose curve paramters
+T_REF <- debpars[1]-273
+TA <- debpars[2] # Arrhenius temperature (K)
+TAL <- debpars[5] # low Arrhenius temperature (K)
+TAH <- debpars[6] # high Arrhenius temperature (K)
+TL <- debpars[3] # low temp boundary (K)
+TH <- debpars[4] # hight temp boundary (K)
+
+# set auxiliary parameters
+del_M <- debpars[9] # shape coefficient (-) 
+E_0 <- debpars[24] # energy of an egg (J)
+mu_E <- 585000 # molar Gibbs energy (chemical potential) of reserve (J/mol)
+
+# set initial state
+stage <- 1 # initial stage
+E_init <- ((debpars[16]/24)*debpars[8]/debpars[14])/(debpars[13]/24) # initial reserve
+E_H_init <- debpars[20]+5 # initial maturity
+v_init <- debpars[25]^3 # initial structure
+
+# reproduction parameters
+clutch_ab <- c(0.085,0.7)#c(0.085,0.7) # paramters for relationship between length (cm) and clutch size: clutch size = a*SVL-b
+viviparous <- 1 # yes
+photostart <- 4 # vernal equinox
+clutchsize <- 2 #
+ma <- log(0.915)/-1317 # Jones et al. 2016 annual survival for adults is 0.915, annual act is 1317 on average 
+mh <- 1#0.342 # survivorship of hatchling in first year, Jones et al. 2016
+  
+# water and food budget.
+gutfill <- 75 # Gut fill (%) at which satiation occurs - if greater than 100%, animal always tries to forage
+raindrink <- 3.51 # mm rain that must fall in a day before rehydration from drinking rainwater occurs
+peyes <- 0.03 # of surface area taken up by open eye, for computing ocular water loss (only when active)
+ptcond <- 0.1 # dec %, proportion of the body contacting the ground
+load('ewl.summary.Rda')
+skinwet <- mean(ewl.summary$skinwet[1:3]) # skin wetness at Tb = 25 deg C
+skinwet <- mean(ewl.summary$skinwet[c(1:3,7:9,13:15,19:21)]) # skin wetness at Tb = 25 deg C
+minwater <- 20 # Minimum tolerated dehydration (% of wet mass) - prohibits foraging if greater than this
+aestdepth <- 8 # node to which animals retreate to aestivate when desiccated to 'minwater' level, 8 = 60 cm
+plantsim <- c(4, 4, 14, -200, -1500, 82, 1)
+E_sm <- feedpars[4] # maximum stomach energy content, J / cm3 structure
+K <- feedpars[3] # half saturation constant (#/cm2)
+X <- feedpars[1]#111.7/10 # food density (J/cm2)
+startday <- 3*30 # day at which simulation starts, i.e. when hatchling emerges
+aestivate <- 1
+depress <- 0.46
+```
+
+## Get observations
+
+```{r, echo = FALSE}
+library(foreign)
+sleepydata <- read.spss('mark recapture/MMW82-13 6314.SAV', to.data.frame = TRUE)
+sleepydata$date <- as.POSIXct(paste(sleepydata$DAY, sleepydata$MNTH, sleepydata$YEAR, sep = '-'), format = "%d-%m-%Y")
+sleepydata <- subset(sleepydata, WGT < 1500 & LIZN < 9999)
+sleepydata$LGTH[sleepydata$LGTH>50 & is.na(sleepydata$LGTH)==FALSE] <- sleepydata$LGTH[sleepydata$LGTH>50 & is.na(sleepydata$LGTH)==FALSE] / 10
+sleepydata$LGTH[sleepydata$LGTH>50 & is.na(sleepydata$LGTH)==FALSE] <- sleepydata$LGTH[sleepydata$LGTH>50 & is.na(sleepydata$LGTH)==FALSE] / 10
+trim <- function (x) gsub("^\\s+|\\s+$", "", x)
+sleepydata$LIZN <- trim(sleepydata$LIZN)
+sleepydata$SEX <- trim(sleepydata$SEX)
+lizards <- unique(sleepydata$LIZN)
+
+xlims <- c(min(sleepydata$date, na.rm = TRUE), max(sleepydata$date, na.rm = TRUE))
+wgtlims <- c(min(sleepydata$WGT, na.rm = TRUE), max(sleepydata$WGT, na.rm = TRUE))
+lenlims <- c(min(sleepydata$LGTH, na.rm = TRUE), max(sleepydata$LGTH, na.rm = TRUE))
+
+liznums <- aggregate(sleepydata$LIZN, by = list(sleepydata$LIZN), FUN = length)
+liznums <- liznums[order(liznums$x, decreasing = TRUE),]
+liznums <- subset(liznums, x > 50)
+```
+
+\newpage
+
+## Lizards 2013 * 3989
+
+```{r, fig.width = 15, fig.height = 11, echo = FALSE, message = FALSE, warning = FALSE}
+simliz(yrstrt = 1, yrstrt2 = 1, lizard = 2013, init = 3, init2 = 3, limx = 0) # lizard to do
+
+simliz(yrstrt = 5, yrstrt2 = 16, lizard = 3989, init = 1, init2 = 1, limx = 0) # lizard to do
+```
+

@@ -1,0 +1,121 @@
+---
+title: "Waddleometer test: Comparison of observed and predicted (waddleometer) body activity, body temperature and body mass"
+author: "Michael Kearney"
+date: "`r Sys.Date()`"
+output: pdf_document
+classoption: portrait
+vignette: >
+  %\VignetteIndexEntry{Waddleometer test: summary statistics}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+ eval = TRUE, tidy.opts = list(width.cutoff = 60), tidy = TRUE  
+)
+```
+
+## Overview
+
+Histograms and summary statistics for body temperature and activity simulation.
+
+```{r, echo = FALSE, fig.width = 7, fig.height = 4.5, warning = FALSE, message = FALSE}
+library(knitr)
+
+summary2009=read.csv('summary_nodrink_2009.csv')
+summary2010=read.csv('summary_nodrink_2010.csv')
+
+summary_all=rbind(summary2009,summary2010)
+
+hist(summary_all$max_Tb_obs, col=rgb(0.1,0.1,0.1,0.5),xlim=c(30,50), ylim=c(0,120), main="maximum body temperature", xlab=expression(temperature~(degree*C)), breaks = seq(30, 50, 1))
+hist(summary_all$max_Tb_pred, col=rgb(0.8,0.8,0.8,0.5), add=T)
+box()
+
+#t.test(summary_all$max_Tb_obs, summary_all$max_Tb_pred)
+
+hist(summary_all$min_Tb_obs, col=rgb(0.1,0.1,0.1,0.5),xlim=c(-1,15), ylim=c(0,70), main="minimum body temperature", xlab=expression(temperature~(degree*C)), breaks = seq(-1, 15, 1))
+hist(summary_all$min_Tb_pred, col=rgb(0.8,0.8,0.8,0.5), add=T)
+box()
+
+#t.test(summary_all$min_Tb_obs, summary_all$min_Tb_pred)
+
+hist(summary_all$mean_Tb_obs, col=rgb(0.1,0.1,0.1,0.5),xlim=c(15,30), ylim=c(0,40), main="mean body temperature", xlab=expression(temperature~(degree*C)), breaks = seq(15, 30, 1))
+hist(summary_all$mean_Tb_pred, col=rgb(0.8,0.8,0.8,0.5), add=T)
+box()
+
+#t.test(summary_all$mean_Tb_obs, summary_all$mean_Tb_pred)
+
+hist(summary_all$med_Tb_obs, col=rgb(0.1,0.1,0.1,0.5),xlim=c(10,30), ylim=c(0,35), main= "median body temperature", xlab=expression(temperature~(degree*C)), breaks = seq(10, 30, 1))
+hist(summary_all$med_Tb_pred, col=rgb(0.8,0.8,0.8,0.5), add=T, breaks = seq(10, 30, 1))
+box()
+
+#t.test(summary_all$med_Tb_obs, summary_all$med_Tb_pred)
+
+hist(summary_all$Tb_rmsd, plot = TRUE, col=rgb(0.1,0.1,0.1,0.5), main = 'body temperature root mean square error', xlab="root mean square error")
+box()
+hist(summary_all$Tb_r, plot = TRUE, col=rgb(0.1,0.1,0.1,0.5), main = 'body temperature correlation', xlab=expression(temperature~(degree*C)))
+box()
+hist(summary_all$err, plot = TRUE, col=rgb(0.1,0.1,0.1,0.5), main = 'activity error', xlab = 'error')
+box()
+hist(summary_all$day.err, plot = TRUE, col=rgb(0.1,0.1,0.1,0.5), main = 'daytime activity error', xlab = 'error')
+box()
+
+tb.mins <- c(min(summary_all$min_Tb_obs), min(summary_all$min_Tb_pred), min(summary_all$Tb_rmsd), min(summary_all$Tb_r))
+tb.maxs <- c(max(summary_all$max_Tb_obs), max(summary_all$max_Tb_pred), max(summary_all$Tb_rmsd), max(summary_all$Tb_r))
+tb.means <- c(mean(summary_all$mean_Tb_obs), mean(summary_all$mean_Tb_pred), mean(summary_all$Tb_rmsd), mean(summary_all$Tb_r))
+
+err.mins <- c(min(summary_all$err),min(summary_all$true.),min(summary_all$false.),min(summary_all$true..1),min(summary_all$false..1),min(summary_all$day.err),min(summary_all$day.true.),min(summary_all$day.false.),min(summary_all$day.true..1), min(summary_all$day.false..1))
+err.maxs <- c(max(summary_all$err),max(summary_all$true.),max(summary_all$false.),max(summary_all$true..1),max(summary_all$false..1),max(summary_all$day.err),max(summary_all$day.true.),max(summary_all$day.false.),max(summary_all$day.true..1), max(summary_all$day.false..1))
+err.means <- c(mean(summary_all$err),mean(summary_all$true.),mean(summary_all$false.),mean(summary_all$true..1),mean(summary_all$false..1),mean(summary_all$day.err),mean(summary_all$day.true.),mean(summary_all$day.false.),mean(summary_all$day.true..1), mean(summary_all$day.false..1))
+
+cat("\n\n\\pagebreak\n")
+  
+tb.tabl <- round(cbind(tb.mins, tb.maxs, tb.means), 2)
+colnames(tb.tabl) <- c('min', 'max', 'mean')
+rownames(tb.tabl) <- c('observed body temperature', 'predicted body temperature', 'body temperature RMSE', 'body temperature correlation')
+kable(tb.tabl)
+
+err.tabl <- round(cbind(err.mins, err.maxs, err.means), 2)
+colnames(err.tabl) <- c('min', 'max', 'mean')
+rownames(err.tabl) <- c('all activity error', 'all true -',	'all false -', 'all true +',	'all false +', 'day activity error', 'day true -',	'day false -', 'day true +',	'day false +')
+kable(err.tabl)
+
+activelizards <- c(11505,11885,12434,12847,40012,40044,9310,9372)
+
+summary_all_mass_2009 <- subset(summary_all, mass_n > 4 & year == 2009)
+
+summary_all_mass_2009_active <- subset(summary_all, mass_n > 4 & year == 2009 & id %in% activelizards)
+ 
+summary_all_mass_2009_inactive <- subset(summary_all, mass_n > 4 & year == 2009 & !(id %in% activelizards))
+
+summary_all_mass_2010 <- subset(summary_all, mass_n > 4 & year == 2010)
+
+mean(summary_all_mass_2009$mass_R)
+mean(summary_all_mass_2009_inactive$mass_R)
+mean(summary_all_mass_2010$mass_R)
+
+mean(summary_all_mass_2009$mass_rmsd)
+mean(summary_all_mass_2009_inactive$mass_rmsd)
+mean(summary_all_mass_2010$mass_rmsd)
+
+summary_all_mass <- subset(summary_all, mass_n > 4)
+hist(summary_all_mass$mass_rmsd, plot = TRUE, col=rgb(0.1,0.1,0.1,0.5), main = 'mass root mean square error', xlab="root mean square error", ylim = c(0,30), breaks = seq(0,500,10))
+box()
+
+levs <- c("-0.6","-0.5","-0.4","-0.3","-0.2","-0.1","0","0.1","0.2","0.3","0.4","0.5","0.6","0.7","0.8","0.9","1.0")
+f <- cut(summary_all_mass_2010$mass_R, breaks=seq(-.6, 1, .1))
+levels(f) <-  levs
+mass2010<-table(f)
+f <- cut(summary_all_mass_2009$mass_R, breaks=seq(-.6, 1, .1))
+levels(f) <-  levs
+mass2009<-table(f)
+
+mass.r.all <- t(cbind(matrix(mass2010), matrix(mass2009)))
+colnames(mass.r.all) <- levs
+barplot(mass.r.all, beside = TRUE, yaxs = 'i', ylim = c(0,13), main = 'mass correlation coefficient', xlab = 'correlation coefficient', ylab = 'Frequency') 
+box()
+
+
+
+```

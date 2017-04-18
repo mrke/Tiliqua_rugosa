@@ -1,0 +1,131 @@
+---
+title: "Mass change 2009 at Bundey Bore"
+author: "Michael Kearney"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Mass change 2009 at Bundey Bore}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+ eval = TRUE, tidy.opts = list(width.cutoff = 60), tidy = TRUE  
+)
+```
+
+## Overview
+
+This document compares sleepy lizard body mass measured within and outside of the dry period of the 2009 activity season.
+
+## Read in  data
+
+```{r}
+massdata <- read.csv('waddleometer/Church_site_mass_length.csv')
+```
+
+## Analyse mass change in 2009 during drought period
+
+First with all lizards
+
+```{r, fig.width = 7, fig.height = 5, warning = FALSE, message = FALSE}
+
+massdata2009 <- subset(massdata,year==2009) # get 2009
+
+# aggregate to get mass of each animal during dry spell and either side
+massagg_all<- aggregate(massdata2009,by = list(paste(massdata2009$lizard_ID,massdata2009$dryperiod,sep = "_")),mean)[,c(20, 9, 14)]
+colnames(massagg_all) <- c('dry','id','mass')
+
+# break into dry spell or not, then merge
+massagg1 <- subset(massagg_all, dry==1)
+massagg0 <- subset(massagg_all, dry==0)
+massagg_merge <- merge(massagg1, massagg0, by = 'id')
+
+# get mass diffrence and turn into percent, compute mean and print
+diff <- massagg_merge$mass.x-massagg_merge$mass.y
+pctdes <- (diff*-1)/massagg_merge$mass.y*100
+print(paste("mean weight loss",round(mean(pctdes, na.rm = TRUE),1), "%"))
+print(paste("max weight loss",round(max(pctdes, na.rm = TRUE),1), "%"))
+
+# create table of differences
+massagg_merge <- cbind(massagg_merge,diff,pctdes)
+with(massagg_merge,{t.test(mass.x,mass.y,paired = TRUE)})
+
+# create box plot with lines joining individuals
+s <- seq(length(massagg_merge$mass.x))
+par(bty = "l")
+boxplot(massagg_merge$mass.y, massagg_merge$mass.x, xlab = "Time", ylab = "mass (g)", names = c("out of dry spell", "in dry spell"), col = c("lightgreen", "brown"), ylim = c(400,1000))
+
+stripchart(list(massagg_merge$mass.y, massagg_merge$mass.x), vertical = T,pch = 16,cex = 0.5,add = T)
+segments(rep(1, length(massagg_merge$mass.y))[s], massagg_merge$mass.y[s], rep(2, length(massagg_merge$mass.y))[s], massagg_merge$mass.x[s], col = 'grey', lwd = 0.5)
+```
+
+Second excluding animals that remained active
+
+```{r, fig.width = 7, fig.height = 5, warning = FALSE, message = FALSE}
+
+activelizards <- c(9532,9372,9364,9363,9310,40044,40012,12847,12434,11885,11505,10509)
+
+massdata2009 <- subset(massdata,year==2009 & !(lizard_ID%in%activelizards))
+# aggregate to get mass of each animal during dry spell and either side
+massagg_all<- aggregate(massdata2009,by = list(paste(massdata2009$lizard_ID,massdata2009$dryperiod,sep = "_")),mean)[,c(20, 9, 14)]
+colnames(massagg_all) <- c('dry','id','mass')
+
+# break into dry spell or not, then merge
+massagg1 <- subset(massagg_all, dry==1)
+massagg0 <- subset(massagg_all, dry==0)
+massagg_merge <- merge(massagg1, massagg0, by = 'id')
+
+# get mass diffrence and turn into percent, compute mean and print
+diff <- massagg_merge$mass.x-massagg_merge$mass.y
+pctdes <- (diff*-1)/massagg_merge$mass.y*100
+print(paste("mean weight loss",round(mean(pctdes, na.rm = TRUE),1), "%"))
+print(paste("max weight loss",round(max(pctdes, na.rm = TRUE),1), "%"))
+
+# create table of differences
+massagg_merge <- cbind(massagg_merge,diff,pctdes)
+with(massagg_merge,{t.test(mass.x,mass.y,paired = TRUE)})
+
+# create box plot with lines joining individuals
+s <- seq(length(massagg_merge$mass.x))
+par(bty = "l")
+boxplot(massagg_merge$mass.y, massagg_merge$mass.x, xlab = "Time", ylab = "mass (g)", names = c("out of dry spell", "in dry spell"), col = c("lightgreen", "brown"), ylim = c(400,1000))
+
+stripchart(list(massagg_merge$mass.y, massagg_merge$mass.x), vertical = T,pch = 16,cex = 0.5,add = T)
+segments(rep(1, length(massagg_merge$mass.y))[s], massagg_merge$mass.y[s], rep(2, length(massagg_merge$mass.y))[s], massagg_merge$mass.x[s], col = 'grey', lwd = 0.5)
+```
+
+Third, only including animals that remained active
+
+```{r, fig.width = 7, fig.height = 5, warning = FALSE, message = FALSE}
+massdata2009 <- subset(massdata,year==2009 & lizard_ID%in%activelizards)
+# aggregate to get mass of each animal during dry spell and either side
+massagg_all<- aggregate(massdata2009,by = list(paste(massdata2009$lizard_ID,massdata2009$dryperiod,sep = "_")),mean)[,c(20, 9, 14)]
+colnames(massagg_all) <- c('dry','id','mass')
+
+# break into dry spell or not, then merge
+massagg1 <- subset(massagg_all, dry==1)
+massagg0 <- subset(massagg_all, dry==0)
+massagg_merge <- merge(massagg1, massagg0, by = 'id')
+
+# get mass diffrence and turn into percent, compute mean and print
+diff <- massagg_merge$mass.x-massagg_merge$mass.y
+pctdes <- (diff*-1)/massagg_merge$mass.y*100
+print(paste("mean weight loss",round(mean(pctdes, na.rm = TRUE),1), "%"))
+print(paste("max weight loss",round(max(pctdes, na.rm = TRUE),1), "%"))
+
+# create table of differences
+massagg_merge <- cbind(massagg_merge,diff,pctdes)
+with(massagg_merge,{t.test(mass.x,mass.y,paired = TRUE)})
+
+# create box plot with lines joining individuals
+s <- seq(length(massagg_merge$mass.x))
+par(bty = "l")
+boxplot(massagg_merge$mass.y, massagg_merge$mass.x, xlab = "Time", ylab = "mass (g)", names = c("out of dry spell", "in dry spell"), col = c("lightgreen", "brown"), ylim = c(400,1000))
+
+stripchart(list(massagg_merge$mass.y, massagg_merge$mass.x), vertical = T,pch = 16,cex = 0.5,add = T)
+segments(rep(1, length(massagg_merge$mass.y))[s], massagg_merge$mass.y[s], rep(2, length(massagg_merge$mass.y))[s], massagg_merge$mass.x[s], col = 'grey', lwd = 0.5)
+```

@@ -1,0 +1,451 @@
+---
+title: "Figure 5. Observed vs. predicted activity levels"
+author: "Michael Kearney"
+date: "`r Sys.Date()`"
+output: pdf_document
+classoption: landscape
+vignette: >
+  %\VignetteIndexEntry{Figure 1. Observed vs. predicted body temperatures}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+ eval = TRUE, tidy.opts = list(width.cutoff = 60), tidy = TRUE  
+)
+```
+
+## Overview
+
+This document reads in the output produced by the file "Tiliqua rugosa simulation at Bundey Bore.Rmd" and the observed activity (waddle) data and compares them for each lizard in 2009 and 2010. It saves the summary statistics (correlation coefficient, root mean square error and confusion matrix) to files in the folder 'waddle test'. 
+
+## Set up simulation and load the input data
+
+```{r}
+# First load the necessary packages and functions
+
+library(NicheMapR)
+library(raster)
+library(dismo)
+library(knitr)
+library(mda)
+source('addTrans.R') # function for making transparent plots
+
+correl_all_2009 <- read.csv('correl_all_2009.csv')[,-1]
+correl_all_2010 <- read.csv('correl_all_2010.csv')[,-1]
+allforage_2009 <- read.csv('allforage_2009.csv')[,-1]
+allforage_2010 <- read.csv('allforage_2010.csv')[,-1]
+allnoforage_2009 <- read.csv('allnoforage_2009.csv')[,-1]
+allnoforage_2010 <- read.csv('allnoforage_2010.csv')[,-1]
+
+# Read in ectotherm model simulation
+
+load('ecto.Rda')
+
+ystart <- 1991# start year
+yfinish <- 2010# end year
+nyears<-yfinish - ystart+1# integer, number of years for which to run the microclimate model
+
+# extract ectotherm model output
+metout <- as.data.frame(ecto$metout)
+rainfall <- as.data.frame(ecto$RAINFALL)
+foodwaters <- as.data.frame(ecto$foodwaters)
+foodlevels <- as.data.frame(ecto$foodlevels)
+environ <- as.data.frame(ecto$environ)
+debout <- as.data.frame(ecto$debout)
+foodwaters <- as.data.frame(ecto$foodwaters)
+foodlevels <- as.data.frame(ecto$foodlevels)
+environ<-cbind(environ, metout$SOLR) # add solar radiation
+colnames(environ)[ncol(environ)] <- "Solar"
+
+# append dates
+tzone <- paste("Etc/GMT+",10, sep = "") # doing it this way ignores daylight savings!
+dates <- seq(ISOdate(ystart, 1, 1, tz = tzone)-3600*12, ISOdate((ystart+nyears),1, 1, tz = tzone)-3600*13, by = "hours")
+dates <- subset(dates, format(dates, "%m/%d")!= "02/29") # remove leap years
+dates2 <- seq(ISOdate(ystart, 1, 1, tz = tzone)-3600*12, ISOdate((ystart+nyears),1, 1, tz = tzone)-3600*13, by = "days") 
+dates2 <- subset(dates2, format(dates2, "%m/%d")!= "02/29") # remove leap years
+
+debout <- as.data.frame(cbind(dates, debout))
+environ <- as.data.frame(cbind(dates, environ))
+metout <- as.data.frame(cbind(dates, metout))
+rainfall <- as.data.frame(cbind(dates2, rainfall))
+colnames(rainfall) <- c("dates", "rainfall")
+```
+
+## Read in Mike Bull's data and merge with predictions
+
+```{r}
+waddlefiles <- read.csv("waddleometer/waddle_files_all.csv")
+massdata <- read.csv('waddleometer/Church_site_mass_length_noJan2010.csv')
+sex <- read.csv("waddleometer/sex.csv",stringsAsFactors = FALSE)
+
+#Subset to 2009-2010 and frame-shift by half an hour to account for 1/2 hr time difference in South Australia
+
+merge <- as.data.frame(paste(with(environ, as.numeric(format(dates, "%Y"))),"_",with(environ, as.numeric(format(dates, "%m"))),"_",with(environ, as.numeric(format(dates, "%d"))),"_",environ$TIME-1, sep = ""))
+colnames(merge) <- 'merge'
+environ2 <- cbind(environ, merge)
+environ3 <- environ2
+environ4 <- subset(environ3, format(dates,"%Y")>=2009)
+environ5 <- environ4
+for(l in 1:nrow(environ4)){ # make values average of prev hour to account for 1/2 time diff in SA
+  if(l==nrow(environ4)){
+    environ5[l, 6] <- environ4[l, 6]
+  }else{
+    environ5[l, 6] <- environ5[l, 6]+(environ4[l+1, 6]-environ4[l, 6])/2
+  }
+}
+```
+
+## Figure 5 Movement rate vs Tb
+
+```{r}
+source('getwaddle.R') # function to read in waddleometer data for particular lizard
+source('aggwaddle.R') # function to aggregate waddleometer data from 2m to hourly
+
+TBASK <- 26
+threshold.act <- 50
+startdy <- 250
+finishdy <- 355
+
+allforage <- allforage_2010
+allnoforage <- allnoforage_2010
+
+# find times when lizards were moving and not moving
+allforage <- subset(allforage,  subset = (Steps > threshold.act))
+curyear <- 2010
+
+filename=paste("Figure 5.pdf",sep="") 
+pdf(filename,paper="A4",width=11,height=15) 
+
+par(mfrow = c(3, 1)) # set up for 2 plots in 2 columns
+par(oma = c(2, 2, 2, 2) + 0.1) # margin spacing
+par(mar = c(5, 5, 2, 1) + 0.1) # margin spacing 
+par(mgp = c(3, 1, 0) ) # margin spacing
+
+# Plot part a, mean activity of all animals
+
+sleepy_id <- 11885
+waddledata <- get_waddle(sleepy_id = sleepy_id, year = curyear)
+sleepy <- waddledata$sleepy
+curyear <- waddledata$curyear
+sexlizard <- waddledata$sexlizard
+date_waddle <- waddledata$date_waddle
+
+plotrainfall <- subset(rainfall,substr(dates,1,4)==curyear)
+doy2 <- strptime(format(plotrainfall$dates, "%y/%m/%d"), "%y/%m/%d")$yday + 1 # get simulation day of year
+
+environ_bask <- subset(environ5,  subset = (ACT >= 1 & TC >= TBASK & substr(dates, 1, 4) == curyear))
+environ_forage <- subset(environ5,  subset = (ACT > 1 & substr(dates, 1, 4) == curyear))
+environ_night <- subset(metout,  subset = (ZEN == 90))
+environ_night$TIME <- environ_night$TIME/60-1
+
+sleepy <- aggwaddle(sleepy)
+
+doy2 <- strptime(format(plotrainfall$dates, "%y/%m/%d"), "%y/%m/%d")$yday+1
+plotrainfall2 <- cbind(doy2, plotrainfall)
+colnames(plotrainfall2) <- c("JULDAY", "dates", "RAINFALL")
+desic <- subset(debout,TIME == 24 & substr(dates, 1, 4) == curyear)
+desic <- as.data.frame(cbind(desic[,2], desic[,20]))
+colnames(desic) <- c('day','desic')
+
+# plot night hours
+with(environ_night, {plot(TIME+2~JULDAY, xlim = c(startdy, finishdy), ylim = c(0, 25), xlab = "day of year", ylab = "hour of day", cex = 0.5, col = "dark grey", pch = 16, main = "a) mean observed activity vs. potential activity", cex.lab = 1.5, cex.main = 1.5)})
+
+# plot basking hours      
+with(environ_bask, {points(TIME~JULDAY, xlim = c(startdy, finishdy), ylim = c(0, 25),xlab = "day of year", ylab = "hour of day", cex = 1.,col = "light blue", pch = 15)})
+
+# plot foraging hours
+with(environ_forage, {points(TIME~JULDAY, xlim = c(startdy, finishdy), ylim = c(0, 25), xlab = "day of year", ylab = "hour of day", cex = 1., col = "light blue", pch = 15)})
+
+with(plotrainfall2, {points(RAINFALL~JULDAY, type = "h",col='blue')})
+
+agglist <- list(paste(allforage$Year, "_", allforage$Month, "_", allforage$Day, "_", allforage$Hours, sep=""))
+
+# get mean steps per hour across all lizards and plot
+meanwaddle <- aggregate(allforage$Steps, by = agglist, mean)
+meanhour <- aggregate(allforage$Hours,by = agglist, mean)
+meandoy <- aggregate(allforage$doy,by = agglist, mean)
+meanwaddle <- cbind(meanwaddle,meanhour[,2], meandoy[,2])
+colnames(meanwaddle) <- c('date', 'Steps', 'Hours', 'doy')
+with(meanwaddle, {points(Hours + 1 ~ doy, xlim = c(startdy, finishdy), ylim = c(0, 25),xlab = "day of year",ylab = "hour of day", cex = log(meanwaddle$Steps/300), pch = 15, col = addTrans("red", 100))}) 
+
+arrows(248, 16.5, 248, 14.5, lwd = 2, angle = 10, length = 0.1)
+arrows(257, 17.5, 257, 15.5, lwd = 2, angle = 10, length = 0.1)
+arrows(263, 17.5, 263, 15.5, lwd = 2, angle = 10, length = 0.1)
+arrows(289, 16.5, 289, 14.5, lwd = 2, angle = 10, length = 0.1)
+arrows(317, 25.5, 317, 23.5, lwd = 2, angle = 10, length = 0.1)
+arrows(341, 4.5, 341, 2.5, lwd = 2, angle = 10, length = 0.1)
+
+# Part b, high activity individual 11885 
+
+# plot night hours
+with(environ_night, {plot(TIME+2~JULDAY, xlim = c(startdy, finishdy), ylim = c(0, 25), xlab = "day of year", ylab = "hour of day", cex = 0.5, col = "dark grey", pch = 16, main = "b) male 11885 observed activity vs. potential activity", cex.lab = 1.5, cex.main = 1.5)})
+
+# plot basking hours      
+with(environ_bask, {points(TIME~JULDAY, xlim = c(startdy, finishdy), ylim = c(0, 25), xlab = "day of year", ylab = "hour of day", cex = 1., col = "light blue", pch = 15)})
+
+# plot foraging hours
+with(environ_forage, {points(TIME~JULDAY, xlim = c(startdy, finishdy), ylim = c(0, 25), xlab = "day of year", ylab = "hour of day", cex = 1., col = "light blue", pch = 15)})
+
+with(plotrainfall2, {points(RAINFALL~JULDAY, type = "h",col='blue')})
+
+# find times when lizards were moving and not moving
+plotlizard_forage <- subset(sleepy,  subset = (Steps > threshold.act))
+
+# plot observed foraging
+with(plotlizard_forage, {points(Hours+1~doy, xlim = c(startdy, finishdy),ylim = c(0, 25),xlab = "day of year",ylab = "hour of day",cex = log(plotlizard_forage$Steps/300),pch = 15, col = addTrans("red",100))})
+
+# Part c, low activity individual 11533
+
+sleepy_id <- 11533
+waddledata <- get_waddle(sleepy_id = sleepy_id, year = curyear)
+sleepy <- waddledata$sleepy
+curyear <- waddledata$curyear
+sexlizard <- waddledata$sexlizard
+date_waddle <- waddledata$date_waddle
+
+doy2 <- strptime(format(plotrainfall$dates, "%y/%m/%d"), "%y/%m/%d")$yday + 1 # get simulation day of year
+
+sleepy <- aggwaddle(sleepy)
+# plot night hours
+with(environ_night, {plot(TIME+2~JULDAY, xlim = c(startdy, finishdy), ylim = c(0, 25), xlab = "day of year", ylab = "hour of day", cex = 0.5, col = "dark grey", pch = 16, main = "c) female 11533 observed activity vs. predicted feeding events", cex.lab = 1.5, cex.main = 1.5)})
+
+# plot foraging hours
+with(environ_forage, {points(TIME~JULDAY, xlim = c(startdy, finishdy), ylim = c(0, 25), xlab = "day of year", ylab = "hour of day", cex = 1., col = "light blue", pch = 15)})
+
+with(plotrainfall2, {points(RAINFALL~JULDAY, type = "h",col='blue')})
+
+# find times when lizards were moving and not moving
+plotlizard_forage <- subset(sleepy,  subset = (Steps > threshold.act))
+
+# plot observed foraging
+with(plotlizard_forage, {points(Hours+1~doy, xlim = c(startdy, finishdy),ylim = c(0, 25),xlab = "day of year",ylab = "hour of day",cex = log(plotlizard_forage$Steps/300),pch = 15, col = addTrans("red",100))})
+
+dev.off()
+```
+
+# Figure 6 2009 Tb and movement rate with and without water-limited activity
+
+```{r}
+TBASK <- 26
+threshold.act <- 50
+startdy <- 250
+finishdy <- 355
+
+allforage <- allforage_2009
+allnoforage <- allnoforage_2009
+
+# find times when lizards were moving and not moving
+allforage <- subset(allforage,  subset = (Steps > threshold.act))
+curyear <- 2009
+
+filename=paste("Figure 6.pdf",sep="") 
+pdf(filename,paper="A4",width=11,height=15) 
+
+par(mfrow = c(4, 1)) # set up for 2 plots in 2 columns
+par(oma = c(2, 2, 2, 2) + 0.1) # margin spacing
+par(mar = c(5, 5, 2, 1) + 0.1) # margin spacing 
+par(mgp = c(3, 1, 0) ) # margin spacing
+
+# Plot part a, mean activity of all animals
+
+sleepy_id <- 11129
+waddledata <- get_waddle(sleepy_id = sleepy_id, year = curyear)
+sleepy <- waddledata$sleepy
+curyear <- waddledata$curyear
+sexlizard <- waddledata$sexlizard
+date_waddle <- waddledata$date_waddle
+sleepy <- aggwaddle(sleepy)
+
+plotrainfall <- subset(rainfall,substr(dates,1,4)==curyear)
+doy2 <- strptime(format(plotrainfall$dates, "%y/%m/%d"), "%y/%m/%d")$yday + 1 # get simulation day of year
+
+environ_bask <- subset(environ5,  subset = (ACT >= 1 & TC >= TBASK & substr(dates, 1, 4) == curyear))
+environ_forage <- subset(environ5,  subset = (ACT > 1 & substr(dates, 1, 4) == curyear))
+environ_night <- subset(metout,  subset = (ZEN == 90))
+environ_night$TIME <- environ_night$TIME/60-1
+
+doy2 <- strptime(format(plotrainfall$dates, "%y/%m/%d"), "%y/%m/%d")$yday+1
+plotrainfall2 <- cbind(doy2, plotrainfall)
+colnames(plotrainfall2) <- c("JULDAY", "dates", "RAINFALL")
+desic <- subset(debout,TIME == 24 & substr(dates, 1, 4) == curyear)
+desic <- as.data.frame(cbind(desic[,2], desic[,20]))
+colnames(desic) <- c('day','desic')
+
+# now plot Tb trace through time
+
+# limit plot to time when data is available
+daystart <- paste(substr(curyear, 3, 4), '/08/24',sep = "") # y/m/d
+dayfin <- paste(substr(curyear, 3, 4), '/12/31',sep = "") # y/m/d
+
+# subset observed temps to observation window and ensure they are in date order
+plotlizard <- subset(sleepy, format(sleepy$date_waddle, "%y/%m/%d") >= daystart & format(sleepy$date_waddle, "%y/%m/%d") <= dayfin)
+plotlizard <- plotlizard[order(plotlizard$date_waddle),]
+
+# subset predicted lizard temps, condition and microclimate
+plotpred <- subset(environ5, format(environ5$dates, "%y/%m/%d") >= daystart & format(environ5$dates, "%y/%m/%d") <= dayfin)
+plotdeb <- subset(debout, format(debout$dates, "%y/%m/%d") >= daystart & format(environ$dates, "%y/%m/%d") <= dayfin)
+plotmetout <- subset(metout, format(metout$dates, "%y/%m/%d")>= daystart & format(metout$dates, "%y/%m/%d") <= dayfin)
+
+# merge observed and predicted to avoid continuous line between sample gaps
+plotlizard2 <- plotlizard
+colnames(plotlizard2)[1] <- "dates"
+plotlizard2 <- merge(plotlizard2, plotpred, all = TRUE)
+
+# plot predicted Tb trace
+with(plotpred, {plot(TC~dates, type = "l",ylim = c(0, 40),ylab = "",xlab = "", cex.axis = 1.5, cex.lab = 1.5, main = 'a) male 11129 observed and predicted body temperature', cex.main = 1.5)})
+mtext(text = expression(temperature~(degree*C)),side = 2, padj = -1.5)
+mtext(text = "date",side = 1, padj = 4)
+
+# plot observed Tb
+with(plotlizard2, {points(Temperature~dates, type = "l",col = addTrans("red",150))})
+
+# plot predicted desiccation level and rainfall
+with(plotdeb, {points(Body_cond~dates, type = "l",col = 'grey',lty = 2, lwd = 2)})
+with(plotrainfall2, {points(RAINFALL~dates, type = "h",col = 'blue')})
+
+
+# plot night hours
+with(environ_night, {plot(TIME+2~JULDAY, xlim = c(startdy, finishdy), ylim = c(0, 25), xlab = "day of year", ylab = "hour of day", cex = 0.5, col = "dark grey", pch = 16, main = "b) male 11129 observed and predicted activity", cex.lab = 1.5, cex.main = 1.5)})
+
+# plot basking hours      
+with(environ_bask, {points(TIME~JULDAY, xlim = c(startdy, finishdy), ylim = c(0, 25),xlab = "day of year", ylab = "hour of day", cex = 1.,col = "light blue", pch = 15)})
+
+# plot foraging hours
+with(environ_forage, {points(TIME~JULDAY, xlim = c(startdy, finishdy), ylim = c(0, 25), xlab = "day of year", ylab = "hour of day", cex = 1., col = "light blue", pch = 15)})
+
+with(plotrainfall2, {points(RAINFALL~JULDAY, type = "h",col='blue')})
+
+# find times when lizards were moving and not moving
+plotlizard_forage <- subset(sleepy,  subset = (Steps > threshold.act))
+
+# plot observed foraging
+with(plotlizard_forage, {points(Hours+1~doy, xlim = c(startdy, finishdy),ylim = c(0, 25),xlab = "day of year",ylab = "hour of day",cex = log(plotlizard_forage$Steps/300),pch = 15, col = addTrans("red",100))})
+
+# Part c, active individual 12434
+
+sleepy_id <- 12434
+
+# Read in ectotherm model simulation
+
+load('ecto_drink.Rda')
+ecto <- ecto_drink
+
+ystart <- 1991# start year
+yfinish <- 2010# end year
+nyears<-yfinish - ystart+1# integer, number of years for which to run the microclimate model
+
+# extract ectotherm model output
+metout <- as.data.frame(ecto$metout)
+rainfall <- as.data.frame(ecto$RAINFALL)
+foodwaters <- as.data.frame(ecto$foodwaters)
+foodlevels <- as.data.frame(ecto$foodlevels)
+environ <- as.data.frame(ecto$environ)
+debout <- as.data.frame(ecto$debout)
+foodwaters <- as.data.frame(ecto$foodwaters)
+foodlevels <- as.data.frame(ecto$foodlevels)
+environ<-cbind(environ, metout$SOLR) # add solar radiation
+colnames(environ)[ncol(environ)] <- "Solar"
+
+# append dates
+tzone <- paste("Etc/GMT-",10, sep = "") # doing it this way ignores daylight savings!
+dates <- seq(ISOdate(ystart, 1, 1, tz = tzone)-3600*12, ISOdate((ystart+nyears),1, 1, tz = tzone)-3600*13, by = "hours")
+dates <- subset(dates, format(dates, "%m/%d")!= "02/29") # remove leap years
+dates2 <- seq(ISOdate(ystart, 1, 1, tz = tzone)-3600*12, ISOdate((ystart+nyears),1, 1, tz = tzone)-3600*13, by = "days") 
+dates2 <- subset(dates2, format(dates2, "%m/%d")!= "02/29") # remove leap years
+
+debout <- as.data.frame(cbind(dates, debout))
+environ <- as.data.frame(cbind(dates, environ))
+metout <- as.data.frame(cbind(dates, metout))
+rainfall <- as.data.frame(cbind(dates2, rainfall))
+colnames(rainfall) <- c("dates", "rainfall")
+
+merge <- as.data.frame(paste(with(environ, as.numeric(format(dates, "%Y"))),"_",with(environ, as.numeric(format(dates, "%m"))),"_",with(environ, as.numeric(format(dates, "%d"))),"_",environ$TIME-1, sep = ""))
+colnames(merge) <- 'merge'
+environ2 <- cbind(environ, merge)
+environ3 <- environ2
+environ4 <- subset(environ3, format(dates,"%Y")>=2009)
+environ5 <- environ4
+for(l in 1:nrow(environ4)){ # make values average of prev hour to account for 1/2 time diff in SA
+  if(l==nrow(environ4)){
+    environ5[l, 6] <- environ4[l, 6]
+  }else{
+    environ5[l, 6] <- environ5[l, 6]+(environ4[l+1, 6]-environ4[l, 6])/2
+  }
+}
+
+waddledata <- get_waddle(sleepy_id = sleepy_id, year = curyear)
+sleepy <- waddledata$sleepy
+curyear <- waddledata$curyear
+sexlizard <- waddledata$sexlizard
+date_waddle <- waddledata$date_waddle
+sleepy <- aggwaddle(sleepy)
+
+plotrainfall <- subset(rainfall,substr(dates,1,4)==curyear)
+doy2 <- strptime(format(plotrainfall$dates, "%y/%m/%d"), "%y/%m/%d")$yday + 1 # get simulation day of year
+
+environ_bask <- subset(environ5,  subset = (ACT >= 1 & TC >= TBASK & substr(dates, 1, 4) == curyear))
+environ_forage <- subset(environ5,  subset = (ACT > 1 & substr(dates, 1, 4) == curyear))
+environ_night <- subset(metout,  subset = (ZEN == 90))
+environ_night$TIME <- environ_night$TIME/60-1
+
+doy2 <- strptime(format(plotrainfall$dates, "%y/%m/%d"), "%y/%m/%d")$yday+1
+plotrainfall2 <- cbind(doy2, plotrainfall)
+colnames(plotrainfall2) <- c("JULDAY", "dates", "RAINFALL")
+desic <- subset(debout,TIME == 24 & substr(dates, 1, 4) == curyear)
+desic <- as.data.frame(cbind(desic[,2], desic[,20]))
+colnames(desic) <- c('day','desic')
+
+# now plot Tb trace through time
+
+# limit plot to time when data is available
+daystart <- paste(substr(curyear, 3, 4), '/08/24',sep = "") # y/m/d
+dayfin <- paste(substr(curyear, 3, 4), '/12/31',sep = "") # y/m/d
+
+# subset observed temps to observation window and ensure they are in date order
+plotlizard <- subset(sleepy, format(sleepy$date_waddle, "%y/%m/%d") >= daystart & format(sleepy$date_waddle, "%y/%m/%d") <= dayfin)
+plotlizard <- plotlizard[order(plotlizard$date_waddle),]
+
+# subset predicted lizard temps, condition and microclimate
+plotpred <- subset(environ5, format(environ5$dates, "%y/%m/%d") >= daystart & format(environ5$dates, "%y/%m/%d") <= dayfin)
+plotdeb <- subset(debout, format(debout$dates, "%y/%m/%d") >= daystart & format(environ$dates, "%y/%m/%d") <= dayfin)
+plotmetout <- subset(metout, format(metout$dates, "%y/%m/%d")>= daystart & format(metout$dates, "%y/%m/%d") <= dayfin)
+
+# merge observed and predicted to avoid continuous line between sample gaps
+plotlizard2 <- plotlizard
+colnames(plotlizard2)[1] <- "dates"
+plotlizard2 <- merge(plotlizard2, plotpred, all = TRUE)
+
+# plot predicted Tb trace
+with(plotpred, {plot(TC~dates, type = "l",ylim = c(0, 40),ylab = "",xlab = "", cex.axis = 1.5, cex.lab = 1.5, main = "c) male 12434 observed and predicted body temperature", cex.main = 1.5)})
+mtext(text = expression(temperature~(degree*C)),side = 2, padj = -1.5)
+mtext(text = "date",side = 1, padj = 4)
+
+# plot observed Tb
+with(plotlizard2, {points(Temperature~dates, type = "l",col = addTrans("red",150))})
+
+# plot predicted desiccation level and rainfall
+with(plotdeb, {points(Body_cond~dates, type = "l",col = 'grey',lty = 2, lwd = 2)})
+with(plotrainfall2, {points(RAINFALL~dates, type = "h",col = 'blue')})
+
+
+# plot night hours
+with(environ_night, {plot(TIME+2~JULDAY, xlim = c(startdy, finishdy), ylim = c(0, 25), xlab = "day of year", ylab = "hour of day", cex = 0.5, col = "dark grey", pch = 16, main = "d) male 12434 observed and predicted activity", cex.lab = 1.5, cex.main = 1.5)})
+
+# plot basking hours      
+with(environ_bask, {points(TIME~JULDAY, xlim = c(startdy, finishdy), ylim = c(0, 25),xlab = "day of year", ylab = "hour of day", cex = 1.,col = "light blue", pch = 15)})
+
+# plot foraging hours
+with(environ_forage, {points(TIME~JULDAY, xlim = c(startdy, finishdy), ylim = c(0, 25), xlab = "day of year", ylab = "hour of day", cex = 1., col = "light blue", pch = 15)})
+
+with(plotrainfall2, {points(RAINFALL~JULDAY, type = "h",col='blue')})
+
+# find times when lizards were moving and not moving
+plotlizard_forage <- subset(sleepy,  subset = (Steps > threshold.act))
+
+# plot observed foraging
+with(plotlizard_forage, {points(Hours+1~doy, xlim = c(startdy, finishdy),ylim = c(0, 25),xlab = "day of year",ylab = "hour of day",cex = log(plotlizard_forage$Steps/300),pch = 15, col = addTrans("red",100))})
+
+dev.off()
+```

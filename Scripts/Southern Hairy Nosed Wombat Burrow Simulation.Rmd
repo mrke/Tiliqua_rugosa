@@ -1,0 +1,170 @@
+---
+title: "Simulation tests of burrow temperature and humidity for a Southern Hairy Nosed wombat"
+author: "Michael Kearney"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Simulation tests of burrow temperature and humidity for a Southern Hairy Nosed wombat}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+ eval = TRUE, tidy.opts=list(width.cutoff=60), tidy=TRUE  
+)
+```
+
+## Overview
+
+This document computes vapour pressure in a burrow in Swan Reach Australia using the weighted average method, to compare with Fig. 8 in Shimmin et al (2002)'s wombat burrow study. Greg Shimmin stated via email 15/3/2017 that the raw data are no longer available.
+
+```{r}
+library(NicheMapR)
+library(raster)
+library(dplyr)
+library(scatterplot3d)
+library(akima)
+library(rgl)
+source('addTrans.R')
+```
+
+## Run the model with daily gridded data for Australia
+
+Run the model using historical daily gridded data for Australia from 1999 to 2000
+
+First set up some soil properties for the site.
+
+```{r}
+#source("c:/git/micro_australia/get.soil.R")
+ystart <- 1999# start year
+yfinish <- 2000# end year
+nyears<-yfinish-ystart+1# integer, number of years for which to run the microclimate model
+loc <- c(139.613933, -34.570727)
+longlat <- rbind(loc)
+```
+
+Now set the soil properties. First retrieve soil properties from Soil and Landscape Grid of Australia (SLGA)
+
+```{r, eval=TRUE}
+prevdir<-getwd()
+setwd('x:')
+cmd<-paste("R --no-save --args ",longlat[1]," ",longlat[2]," < extract.R",sep='')
+system(cmd)
+soilpro<-read.csv('data.csv')
+setwd(prevdir)
+soilpro[,1]<-c(2.5,7.5,22.5,45,80,150)
+colnames(soilpro)[1] <- 'depth'
+```
+
+Now get hydraulic properties for this soil using Cosby et al. 1984 pedotransfer functions.
+
+```{r, eval=TRUE}
+DEP <- c(0., 1.,  3, 5.,  10,  15,  30.,  60.,  100.,  200.) # Soil nodes (cm)
+soil.hydro<-pedotransfer(soilpro = as.data.frame(soilpro), DEP = DEP)
+PE<-soil.hydro$PE
+BB<-soil.hydro$BB
+BD<-soil.hydro$BD
+KS<-soil.hydro$KS
+BD[1:9]<-BD[1:9]#*1.7 # make top 15 cm more dense
+BulkDensity <- BD[seq(1,19,2)]*1000 #soil bulk density, kg/m3
+```
+
+Get qualitative soil type out of interest.
+
+```{r, eval=TRUE}
+# search through observed textures and find the nearest match to Campell and Norman's Table 9.1
+stypes<-NULL
+for(m in 1:nrow(soilpro)){
+ ssq<-(CampNormTbl9_1[,2]-soilpro[m,4]/100)^2 + (CampNormTbl9_1[,3]-soilpro[m,3]/100)^2
+ stypes[m]<-which(ssq==min(ssq))
+}
+
+# produce a table of the qualitative soil profile
+soils<-as.character(CampNormTbl9_1[,1])
+profile<-as.data.frame(cbind(soilpro[,1],soils[stypes]), stringsAsFactors=FALSE)
+profile[,1]<-as.numeric(profile[,1])
+colnames(profile)<-c("depth","soiltype")
+library(knitr)
+kable(profile)
+``` 
+
+Get Leaf Area Index estimate
+
+```{r, eval=FALSE}
+monthly_LAI <- stack("W:/monthlyLAI.nc")
+lonlat<-as.data.frame(longlat)
+monthly_LAI <- crop(monthly_LAI, extent(lonlat[1,1]-0.1, lonlat[1,1]+0.1, lonlat[1,2]-0.1, lonlat[1,2]+0.1))
+LAI_month<-extract(monthly_LAI, cbind(longlat[1],longlat[2]))
+juldays12 <- c(15, 46, 74, 105, 135, 166, 196, 227, 258, 288, 319, 349)
+LAI <- suppressWarnings(spline(juldays12, LAI_month, n = 365, xmin = 1, xmax = 365, method = "periodic"))$y
+LAI <- rep(LAI, nyears)
+```
+
+Now run the microclimate model and get the output.
+
+```{r, eval=FALSE}
+micro<-micro_aust(loc = loc, maxshade = 70, ystart = ystart, yfinish = yfinish, PE = PE, BB = BB, BD = BD, KS = KS, BulkDensity = BulkDensity, spatial = "w:/", windfac = 1, LAI = LAI, cap = 0, TIMAXS = c(2, 1, 0, 0))
+save(micro, file = "c:/Users/mrke/My Dropbox/Current Research Projects/Tiliqua rugosa/micro_SwanReach.Rda")
+```
+
+Estimate burrow humidity from weighted average vapour pressure between near-surface and soil
+
+```{r}
+load("c:/Users/mrke/My Dropbox/Current Research Projects/Tiliqua rugosa/micro_SwanReach.Rda")
+
+sat <- WETAIR(db = micro$soil[,3:12])$esat # saturated soil vapour pressure
+vpres_soil <- sat * micro$humid[,3:12] # vapour pressure in soil
+e <- WETAIR(db = micro$metout[,3], rh = micro$metout[,5])$e # ambient vapour pressure (soil surface)
+satmean <- vpres_soil # matrix for weighted mean vapour pressure
+weights <- seq(0, .9, .1) # assume linear weighting, with ambient at surface (i.e. start at 0)
+satmean <- t(apply(cbind(e, e, e, e, e, e, e, e, e, e), 1, function(x) x * (1 - weights))) + t(apply(vpres_soil, 1, function(x) x * weights)) # get weighted mean vapour pressure
+newRH<-satmean / sat # compute relative humidity
+newRH[newRH > 1] <- 1 # remove RH > 1
+micro$humid[,3:12] <- newRH # replace values in original soil humidity matrix
+
+# create vector of x y z values
+for(i in 7:10){ # from 30 cm to 2 m
+  temp <- cbind(DEP[i], satmean[,i], e)
+  if(i==7){
+    threeD <- temp
+  }else{
+    threeD <- rbind(threeD, temp)
+  }
+}
+threeD <- as.data.frame(threeD)
+colnames(threeD) <- c("depth", "soil", "ambient")
+
+x <- threeD$depth
+y <- threeD$ambient
+z <- threeD$soil
+x2 <- x/10
+z2 <- -1403.775 + 100.521 * x2 + 3.842 * y - 7.466* x2 ^ 2 + 0.037 * x2 * y - 0.001 * y^2
+
+spl <- scatterplot3d(threeD$depth,   # x axis
+    threeD$ambient,     # y axis
+    threeD$soil    # z axis
+    , highlight.3d = TRUE, grid = TRUE, axis = TRUE, box = TRUE, angle = 120, scale.y = 1.5, pch = 16)
+
+spl$points3d(x,   # x axis
+    y,     # y axis
+    z2,    # z axis
+   pch = 16, col = 'blue')
+
+
+spline <- interp(x, y, z, linear = FALSE)
+spline2 <- which(spline2$x < 0)
+# rotatable 3D plot of points and spline surface
+open3d(scale = c(1 / diff(range(x)), 1 / diff(range(y)), 1 / diff(range(z))))
+open3d(scale = c(0.0058823529, 0.0005567736, 0.0002857874))
+with(spline2,surface3d(x, y, z, alpha = .2))
+points3d(x, y, z2)
+title3d(xlab = "", ylab = "", zlab = "")
+axes3d()
+```
+
+## References
+
+Shimmin, G. A., J. Skinner, and R. V. Baudinette. 2002. The warren architecture and environment of the southern hairy-nosed wombat (Lasiorhinus latifrons). Journal of Zoology 258:469-477.

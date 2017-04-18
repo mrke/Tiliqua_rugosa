@@ -1,0 +1,111 @@
+---
+title: "Figure 4. Observed movement rate vs body temperature"
+author: "Michael Kearney"
+date: "`r Sys.Date()`"
+output: pdf_document
+classoption: landscape
+vignette: >
+  %\VignetteIndexEntry{Figure 1. Observed vs. predicted body temperatures}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+ eval = TRUE, tidy.opts = list(width.cutoff = 60), tidy = TRUE  
+)
+```
+
+## Overview
+
+This document reads in waddleometer data files for all 121 lizards and computes speed from step frequency using the formulae in Kerr et al. 2004. It then plots the relationship between movement speed and body temperature. It also estimates the rate as a function of the Arrhenius temprature response used for the Dynamic Energy Budget model.
+
+## Collate data
+
+```{r, eval = FALSE}
+waddlefiles<-read.csv("waddleometer//waddle_files_all.csv")
+sex<-read.csv("waddle/sex.csv", stringsAsFactors = FALSE)
+
+for(i in 1:121){
+    sleepy_id <- waddlefiles[i, 2] # get lizard ID
+    sexlizard <- as.character(subset(sex, Liz==sleepy_id)[2]) # get lizard sex
+    if(sexlizard == "u" | sexlizard == "character(0)"){
+      sexlizard <- 'unknown'
+    }
+
+    sleepy <- as.data.frame(read.table(file = paste('waddle/',waddlefiles[i, 3],sep = ""), sep = ",", head = TRUE, stringsAsFactors = FALSE)) # read in data
+
+    if(i == 1){
+     speedTemp <- cbind(sleepy_id, sexlizard, as.data.frame(cbind(sleepy$Year, sleepy$Month, sleepy$Day, sleepy$Hours, sleepy$Minutes, sleepy$Temperature, sleepy$Steps),stringsAsFactors = FALSE))
+    #with(sleepy,plot(speed ~ Temperature, type='p', cex= 0.3, ylim = c(0,3), xlim=c(0, 50), ylab = "Speed (km / h)", xlab=expression(paste("Body Temperature (",degree,"C)"))))
+    }else{
+    #  with(sleepy, points(speed ~ Temperature, type = 'p', cex = 0.3))
+      speedTemp <- rbind(cbind(sleepy_id, sexlizard, as.data.frame(cbind(sleepy$Year, sleepy$Month, sleepy$Day, sleepy$Hours, sleepy$Minutes, sleepy$Temperature, sleepy$Steps),stringsAsFactors = FALSE))) 
+    }
+cat(i, ' \n')
+} #end loop through lizards
+colnames(speedTemp) <- c("id", "sex", "year", "month", "day", "hour", "minute", "temperature", "steps")
+save(speedTemp, file = "speedTemp.Rda")
+```
+
+## Compute observed and predicted speed
+
+```{r}
+load('speedTemp.Rda')
+
+# Observed speed
+RSL <- 0.0102 * speedTemp$steps / 2 + 2.282 # relative stride length (mm)
+HLL <- 60 # hind limb length, mm for a 290 mm individual measured by Dale Burzacott on 4/8/2015
+speedTemp$speed <- (RSL * HLL * (speedTemp$steps)) / 1000 / 1000 * 60 # sleepy speed in km / h - using formula in Kerr et al 2004 for distance as a function of relative stride length, stride frequency and hind limb length
+
+# predicted speed
+
+Tb20 <- subset(speedTemp, temperature == 20 & speed > 0)$speed
+Tb20_speed <- mean(Tb20)
+
+debpars <- as.data.frame(read.csv('DEB model/DEB_pars_Tiliqua_rugosa.csv',header = FALSE))$V1 # read in DEB pars
+# set thermal respose curve paramters
+T_REF <- debpars[1] - 273
+TA <- debpars[2] # Arrhenius temperature (K)
+TAL <- debpars[5] # low Arrhenius temperature (K)
+TAH <- debpars[6] # high Arrhenius temperature (K)
+TL <- debpars[3] # low temp boundary (K)
+TH <- debpars[4] # hight temp boundary (K)
+speedTemp$T_corr <- exp(TA*(1/(273.15+T_REF)-1/(273.15+speedTemp$temperature)))/(1+exp(TAL*(1/(273.15+speedTemp$temperature)-1/TL))+exp(TAH*(1/TH-1/(273.15+speedTemp$temperature)))) # correction from 20 to 33.5
+
+speedTemp$pred <- Tb20_speed * speedTemp$T_corr
+
+# Aggregate mean speed per temperature category
+
+speedTemp_move <- subset(speedTemp, speed > 0) # remove non-moving lizards
+
+agg_speedTemp_move <- aggregate(speedTemp_move, by = list(round(speedTemp_move$temperature)), FUN = mean)
+```
+
+## Plot results
+
+```{r}
+source("addTrans.R")
+
+filename=paste("Figure 4.pdf",sep="") 
+pdf(filename,paper="A4",width=9,height=5)
+
+par(mfrow = c(1, 2)) # set up for 2 plots in 2 columns
+par(oma = c(2, 2, 2, 2) + 0.1) # margin spacing stuff
+par(mar = c(5, 5, 2, 1) + 0.1) # margin spacing stuff 
+par(mgp = c(3, 1, 0) ) # margin spacing stuff
+
+with(speedTemp,plot(speed ~ temperature, type='p', cex= 1, ylim = c(0,1.6), xlim=c(5, 42), col = addTrans("black", 20), pch = 16, ylab = "Speed (km / h)", xlab=expression(paste("Body Temperature (",degree,"C)"))))
+
+#points(speedTemp$temperature, speedTemp$T_corr * Tb20_speed, type = 'p', pch = 16, col = 'red')
+
+with(agg_speedTemp_move,plot(speed ~ temperature, type='p', cex= 1, xaxs = 'i', ylim = c(0,0.3), xlim=c(7, 40), col = "black", pch = 16, ylab = "Speed (km / h)", xlab=expression(paste("Body Temperature (",degree,"C)"))))
+
+points(agg_speedTemp_move$temperature, agg_speedTemp_move$T_corr * Tb20_speed, type = 'p', pch = 16, col = 'red')
+
+dev.off()
+```
+
+## Literature Cited
+
+Kerr, G. D., C. M. Bull, and G. R. Cottrell. 2004. Use of an "on board" datalogger to determine lizard activity patterns, body temperature and microhabitat use for extended periods in the field. Wildlife Research 31:171-176.

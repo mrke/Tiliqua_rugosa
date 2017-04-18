@@ -1,0 +1,147 @@
+---
+title: "Estimating skin water resistance of Tiliqua rugosa from Warburg 1965"
+author: "Michael Kearney"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Estimating skin water resistance of Tiliqua rugosa from Warburg 1965}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+ eval = TRUE, tidy.opts=list(width.cutoff=60), tidy=TRUE  
+)
+```
+
+```{r}
+library(knitr)
+library(NicheMapR)
+```
+
+## Overview
+
+This document uses the function 'find_pwet' developed by Elia Pirtle and Michael Kearney to estimate the resistance of the skin to water loss. The ultimate result is an estimate of the percentage surface area that is 'wet', i.e. the percentage of the total surface area that is used in the calculation of evaporative water loss. Calculations are made based on Warburg (1965). 
+
+## Reading in the data
+
+Read in Burbidge's data on water loss rate.
+
+```{r}
+# read in respiration and water loss data
+ewl.data<-as.data.frame(read.csv('Warburg1965_Table3_Tiliqua.csv', stringsAsFactors = FALSE)) 
+```
+
+## Getting inputs for Elia's script
+
+Now we need to specify the inputs for the 'find_pwet'. The function has a variety of possible inputs, with NA values being used where certain inputs are unavailable. First we need the observed total water loss rate, in mg min^-1^. 
+
+```{r}
+Et.reported.mg.min<-c(ewl.data[,3],ewl.data[,4],ewl.data[,5],ewl.data[,6],ewl.data[,7],ewl.data[,8])*315/60  #mg/min
+Ec.reported.mg.min<-NA	#mg/min, Cutaneous water loss rate, if measured
+Er.reported.mg.min<-NA  #mg/min, Respiratory water loss rate, if measured
+Eo.reported.mg.min<-NA  #mg/min, Respiratory water loss rate, if measured
+```
+
+Next we need the experimental temperatures. We don't know the skin and core temperatures but assume that T~b~ is a little higher than T~air~ adn T~skin~ a little higher again.
+
+```{r}
+Ta <- rep(ewl.data[,1],6) #C, ambient air temperature
+Tb <- Ta + 0.002  #C, core body temperature
+Ts <- Ta + 0.001  #C, skin surface temperature
+```
+
+We assume relative humidity of exhaled air is 100% and that the ambient relative humidity is 26.5 % as estimated from Scott's baseline data.
+
+```{r}
+RHex <- rep(100,length(Et.reported.mg.min)) #%, RH inside animal, assume 100%RH
+RHin <- rep(c(rep(2.5,7),rep(97.5,7)),3) #%, RH of ambient air (dried with desiccant)
+```
+
+Mass from which we can also estimate the surface area. Based on the relationship used by default in NicheMapR, $A = 10.4713M^(0.688)$.
+
+```{r}
+mass.g<-rep(315,length(Et.reported.mg.min)) #g, body mass
+SA.m2 <- 10.4713 * mass.g ^ (.688) / 100 ^ 2 #m2, surface area of animal
+```
+
+Now we need respiratory data from which the 'find\_pwet' function estimates the volume of air flowing through the lungs, to partition respiratory water loss. Wilson (1974) provided data on VO2 at a range of temperatures for lizards on average 461 g and a power function fitted to that data is used here. It is adjusted down to a mean mass of 351 g.
+
+```{r}
+Wils1974<-read.csv('DEB model/Wilson1974_Fig4.csv')
+model<-nls(VO2ml_g_h~b*Tb^z,start = list(b = 0.00001, z = 2),data=Wils1974)
+b=coef(model)[1] # get the estimated intercept
+z=coef(model)[2] # get the estimated slope
+VO2.ml.min_orig <- (b * Ta ^ z) / 60 * 461 * ((351 ^ 0.800) / (461 ^ 0.800)) #ml O2 / min, Metabolic rate
+```
+
+Assuming a typical oxygen extraction efficiency for reptiles of 16% as noted in Bennett (1973).
+
+```{r}
+oee <- 16 #%, Oxygen extraction coefficient, if not known assume 16%
+Vt <- NA #ml/breath, Tidal volume, if not known this script uses VO2
+Br <- NA #breaths/min, Breathing rate, if not known this script uses VO2
+vent.ml.min<-NA #ml/min, Ventilation rate, equal to Vt*Br, if not known this script uses VO2
+```
+
+For the properties of the air, sea level pressure is assumed. Wind speed in the oven was not stated by Burbidge (1967) but there was a small fan. A value of 0.08 m/s was used based on an estimate for a similar setup by Hill (1972) for Tuatara.
+
+```{r}
+BP<-NA #air pressure in pa, if unknown, enter altitude
+alt <- 0 # Elevation	(m)
+Cp <- 1.00484 #J/g/K, specific heat of air
+wind<-0.01 # m/s
+```
+
+Finally, we need to specify the posture/behaviour of the animal during the simulation. We assume the eyes were open most of the time during the measurements, as observed by Scott. We have a direct measurement of the % of the surface area taken up by the two eyes. I have assumed that the head makes up 15% of the total surface area of the tuatara and that roughly 10% of the body was in contact with the surfaces of the chamber (and thus not losing water evaporatively).
+
+```{r}
+#If compartment method used, was the eye excluded from the head compartment or corrected for already? Yes=1, no=0  ***OR*** if only total water loss was measured, could the animal's eyes have been open? yes=1, no=0
+eyecorrect<-1 
+#If compartment method used, was the skin on the head included in the head compartment corrected for already? Yes=1, no=0 (This bit isn't functional yet)
+headcorrect<-0  
+headskin<-15  #% percent of skin in the head compartment
+Popen<-1 # proportion of time the eye was open
+# 0.325% of surface area = eyes
+SAeye.m2<-SA.m2*0.0003
+ptcond<-0.0 # a rough guess
+ECdata<-0 # not used
+Welch<-0 # use the Welch and Tracy estimate of tidal volume?
+```
+
+## Run the script and print out the results
+
+Now we have all the inputs which we can put into a list and then send to the 'find_pwet' function, which is sourced in the next code chunk and the results are saved.
+
+```{r, fig.width = 7, fig.height = 6}
+VO2.ml.min <- VO2.ml.min_orig
+pwet=list(ECdata = ECdata, Welch = Welch, eyecorrect=eyecorrect, Et.reported.mg.min=Et.reported.mg.min,Ec.reported.mg.min=Ec.reported.mg.min,Er.reported.mg.min=Er.reported.mg.min,Eo.reported.mg.min=Eo.reported.mg.min,Tb=Tb,Ts=Ts,Ta=Ta,RHex=RHex,RHin=RHin,mass.g=mass.g,SA.m2=SA.m2,VO2.ml.min=VO2.ml.min,oee=oee,Vt=Vt,Br=Br,BP=BP,Cp=Cp,wind=wind,SAeye.m2=SAeye.m2,ptcond=ptcond,Popen=Popen)
+source('find_pwet.R')
+pwet_results<-find_pwet(pwet)
+
+duration<-c(rep(2,7),rep(8,7),rep(24,7))
+results<-as.data.frame(cbind(pwet_results$skinwet, Ta, RHin, duration), stringsAsFactors = FALSE)
+colnames(results)<-c('skinwet','Ta','RH','duration')
+with(subset(results, RH < 10 & duration == 2), plot(skinwet~Ta, ylim = c(0,1.5)))
+with(subset(results, RH < 10 & duration == 8), points(skinwet~Ta, col = 'red'))
+with(subset(results, RH < 10 & duration == 24), points(skinwet~Ta, col = 'blue'))
+
+mean(subset(results$skinwet, results$RH < 10 & results$Ta < 40), na.rm = TRUE)
+mean(subset(results$skinwet, results$RH < 10 & results$Ta == 25), na.rm = TRUE)
+
+ewl.summary <- aggregate(results$skinwet, by = list(paste(results$Ta, results$RH, results$duration)), FUN = mean)
+colnames(ewl.summary) <- c("group", "skinwet")
+save(ewl.summary, file = 'ewl.summary.Rda') # save results for reading in later
+ewl.summary$skinwet <- round(ewl.summary$skinwet,2)
+kable(ewl.summary, format = "markdown")
+```
+
+## References
+Bennett, A. F. 1973. Ventilation in two species of lizards during rest and activity. Comparative Biochemistry and Physiology Part A: Physiology 46:653-671.
+
+Warburg, M. R. 1965. The influence of ambient temperature and humidity on the body temperature and water loss from two Australian lizards, Tiliqua rugosa (Gray) (Scincidae) and Amphibolurus barbatus cuvier (Agamidae). Australian Journal of Zoology 13:331-350.
+
+Wilson, K. J. 1974. The Relationship of Oxygen Supply for Activity to Body Temperature in Four Species of Lizards. Copeia 1974:920-934.

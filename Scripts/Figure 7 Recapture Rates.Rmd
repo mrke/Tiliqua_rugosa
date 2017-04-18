@@ -1,0 +1,115 @@
+---
+title: "Figure 7. Lizard recapture rates"
+author: "Michael Kearney"
+date: "`r Sys.Date()`"
+output: pdf_document
+classoption: landscape
+vignette: >
+  %\VignetteIndexEntry{Figure 7. Lizard recapture rates}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+ eval = TRUE, tidy.opts = list(width.cutoff = 60), tidy = TRUE  
+)
+```
+
+## Overview
+
+This document reads in the data on lizard captures and plots the cumulative recapture rate vs. time for 2009 and 2010. 
+
+```{r}
+load('ecto.Rda')
+
+ystart <- 1991# start year
+yfinish <- 2010# end year
+nyears<-yfinish - ystart+1# integer, number of years for which to run the microclimate model
+
+# extract ectotherm model output
+rainfall <- as.data.frame(ecto$RAINFALL)
+environ <- as.data.frame(ecto$environ)
+
+tzone <- paste("Etc/GMT+",10, sep = "") # doing it this way ignores daylight savings!
+dates <- seq(ISOdate(ystart, 1, 1, tz = tzone)-3600*12, ISOdate((ystart+nyears),1, 1, tz = tzone)-3600*13, by = "hours")
+dates <- subset(dates, format(dates, "%m/%d")!= "02/29") # remove leap years
+dates2 <- seq(ISOdate(ystart, 1, 1, tz = tzone)-3600*12, ISOdate((ystart+nyears),1, 1, tz = tzone)-3600*13, by = "days") 
+dates2 <- subset(dates2, format(dates2, "%m/%d")!= "02/29") # remove leap years
+
+environ <- as.data.frame(cbind(dates, environ))
+rainfall <- as.data.frame(cbind(dates2, rainfall))
+colnames(rainfall) <- c("dates", "rainfall")
+
+waddlefiles<-read.csv("waddleometer/waddle_files_all.csv")
+sex<-read.csv("waddleometer/sex.csv")
+
+merge <- as.data.frame(paste(with(environ, as.numeric(format(dates, "%Y"))), "_", with(environ,as.numeric(format(dates, "%m"))), "_", with(environ,as.numeric(format(dates, "%d"))), "_", environ$TIME - 1 ,sep = ""))
+colnames(merge) <- 'merge'
+plotenviron2 <- cbind(environ, merge)
+plotenviron3 <- subset(plotenviron2, as.numeric(substr(plotenviron2$dates, 6, 7)) > 8)
+plotrainfall <- rainfall
+n <- 1
+
+source('getwaddle.R') # function to read in waddleometer data for particular lizard
+source('aggwaddle.R') # function to aggregate waddleometer data from 2m to hourly
+
+yearstodo <- c(2009,2010)
+
+for(m in 1:2){
+  yeartodo <- yearstodo[m]
+  for(i in 1:121){
+    sleepy_id <- waddlefiles[i, 2]
+    waddledata <- get_waddle(i)
+    sleepy <- waddledata$sleepy
+    curyear <- waddledata$curyear
+    sexlizard <- waddledata$sexlizard
+    date_waddle <- waddledata$date_waddle
+    sleepy <- aggwaddle(sleepy)
+    
+    doy2 <- strptime(format(plotrainfall$dates, "%y/%m/%d"), "%y/%m/%d")$yday + 1
+    
+    curyear <- max(sleepy$Year, na.rm=TRUE)
+    if(curyear == yeartodo){
+      
+      # create new sleepy dataset for merging
+      sleepy2 <- sleepy
+      sleepy2$merge <- date_waddle$Group.1
+      
+      sleepy2$Temperature<-as.factor(sleepy$Temperature)
+      
+      final<-merge(sleepy2,plotenviron3,by='merge',all.y=TRUE)
+      final<-final[order(final$dates),]
+      hour<-as.numeric(final$Hours)
+      hour[hour>=0]<-1
+      hour[is.na(hour)==TRUE]<-0
+      
+      if(n==1){
+        all_hour<-cbind(final[,10:11],hour)
+        colnames(all_hour)<-c('dates','JULDAY','count')
+        n<-n+1
+      }else{
+        all_hour$count<-all_hour$count+hour
+        n<-n+1
+        cat(n,'\n')
+      }
+    }
+  }
+  all_hour<-as.data.frame(all_hour)
+  all_hour<-all_hour[order(all_hour$dates),]
+  all_hour$count<-all_hour$count/n*100
+  write.csv(all_hour,paste0("waddleometer/all_hour_",yeartodo,"2.csv"))
+}
+
+all_hour<-read.csv('waddleometer/all_hour_20092.csv', stringsAsFactors = FALSE)[,-1]
+all_hour$dates <- as.POSIXct(all_hour$dates, format = "%Y-%m-%d %H:%M:%S")
+all_hour_sub<-subset(all_hour,as.numeric(substr(dates,6,7))>=9 & substr(dates,1,4)=="2009")
+plot(all_hour_sub$count~all_hour_sub$date,type='l',ylab='% lizards recorded',xlab='',ylim=c(0,100))
+points(rainfall$rainfall~rainfall$date,type='h',col='blue')
+
+all_hour<-read.csv('waddleometer/all_hour_20102.csv', stringsAsFactors = FALSE)[,-1]
+all_hour$dates <- as.POSIXct(all_hour$dates, format = "%Y-%m-%d %H:%M:%S")
+all_hour_sub<-subset(all_hour,as.numeric(substr(dates,6,7))>=9 & substr(dates,1,4)=="2010")
+plot(all_hour_sub$count~all_hour_sub$date,type='l',ylab='% lizards recorded',xlab='',ylim=c(0,100))
+points(rainfall$rainfall~rainfall$date,type='h',col='blue')
+```

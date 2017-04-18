@@ -1,0 +1,494 @@
+---
+title: "Figure 1-2 and Supp Figures S1-S2: Microclimate tests"
+author: "Michael Kearney"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Figure 2 and Supp Figures S1-S2: Microclimate tests}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+ eval = TRUE, tidy.opts=list(width.cutoff=60), tidy=TRUE  
+)
+```
+
+## Overview
+
+This document creates Figures 1 and S1-S2 based on code in 'Newhaven Weather and Burrow Environment Test.Rmd'.
+
+\newpage
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE, include=TRUE, fig.width = 7, fig.height = 4.5}
+
+library(NicheMapR)
+library(dplyr)
+
+#source("c:/git/micro_australia/get.soil.R")
+ystart <- 2013# start year
+yfinish <- 2014# end year
+nyears<-yfinish-ystart+1# integer, number of years for which to run the microclimate 
+load("c:/Users/mrke/My Dropbox/Current Research Projects/Tiliqua rugosa/micro_Newhaven.Rda")
+
+sat<-WETAIR(db = micro$soil[,3:12])$esat # saturated soil vapour pressure
+vpres_soil<-sat * micro$humid[,3:12] # vapour pressure in soil
+e<-WETAIR(db = micro$metout[,3], rh = micro$metout[,5])$e # ambient vapour pressure (soil surface)
+satmean <- vpres_soil # matrix for weighted mean vapour pressure
+weights <- seq(0, .9, .1) # assume linear weighting, with ambient at surface (i.e. start at 0)
+satmean <- t(apply(cbind(e, e, e, e, e, e, e, e, e, e), 1, function(x) x * (1 - weights))) + t(apply(vpres_soil, 1, function(x) x * weights)) # get weighted mean vapour pressure
+newRH<-satmean / sat # compute relative humidity
+newRH[newRH > 1] <- 1 # remove RH > 1
+micro$humid[ ,3:12] <- newRH # replace values in original soil humidity matrix
+
+tzone=paste("Etc/GMT-",10,sep="") # doing it this way ignores daylight savings!
+dates=seq(ISOdate(ystart,1,1,tz=tzone)-3600*12, ISOdate((ystart+nyears),1,1,tz=tzone)-3600*13, by="hours")
+dates=subset(dates, format(dates, "%m/%d")!= "02/29") # remove leap years
+dates2=seq(ISOdate(ystart,1,1,tz=tzone)-3600*12, ISOdate((ystart+nyears),1,1,tz=tzone)-3600*13, by="days") 
+dates2=subset(dates2, format(dates2, "%m/%d")!= "02/29") # remove leap years
+
+metout <- as.data.frame(cbind(dates,as.data.frame(micro$metout))) # above ground microclimatic conditions, min shade
+soil <- as.data.frame(cbind(dates,as.data.frame(micro$soil))) # soil temperatures, minimum shade
+humid <- as.data.frame(cbind(dates,as.data.frame(micro$humid))) # soil temperatures, minimum shade
+
+gds_dir <- "c:/Users/mrke/My Dropbox/Student Projects/gds/"
+
+# read in soil data
+obs.surfaces <- read.csv(paste0(gds_dir, "csv summaries/all.soil.surfaces.csv"), stringsAsFactors = FALSE)[,-1]
+obs.5cms <- read.csv(paste0(gds_dir, "csv summaries/all.soil.5cms.csv"), stringsAsFactors = FALSE)[,-1]
+obs.15cms <- read.csv(paste0(gds_dir, "csv summaries/all.soil.15cms.csv"), stringsAsFactors = FALSE)[,-1]
+obs.30cms <- read.csv(paste0(gds_dir, "csv summaries/all.soil.30cms.csv"), stringsAsFactors = FALSE)[,-1]
+obs.50cms <- read.csv(paste0(gds_dir, "csv summaries/all.soil.50cms.csv"), stringsAsFactors = FALSE)[,-1]
+obs.1ms <- read.csv(paste0(gds_dir, "csv summaries/all.soil.1ms.csv"), stringsAsFactors = FALSE)[,-1]
+
+# read in burrow data
+obs.burrow.surf <- read.csv(paste0(gds_dir, "csv summaries/all.burrow.surf.csv"), stringsAsFactors = FALSE)[,-1]
+obs.burrow.mid <- read.csv(paste0(gds_dir, "csv summaries/all.burrow.mid.csv"), stringsAsFactors = FALSE)[,-1]
+obs.burrow.deep <- read.csv(paste0(gds_dir, "csv summaries/all.burrow.deep.csv"), stringsAsFactors = FALSE)[,-1]
+
+source('addTrans.R') # function for making transparent plots
+
+# choose time period to plot
+xlims <- c(as.POSIXct("2013-10-01 00:00:00", format = "%Y-%m-%d %H:%M:%S"), as.POSIXct("2014-09-30 00:00:00", format = "%Y-%m-%d %H:%M:%S"))
+
+# read in weather data
+weather_obs <- read.csv(paste0(gds_dir,"csv summaries/weather_obs.csv"), stringsAsFactors = FALSE)[,-1]
+weather_obs$TIMESTAMP <- as.POSIXct(weather_obs$TIMESTAMP, format = "%Y-%m-%d %H:%M:%S")
+weather_obs$TIMESTAMP <- weather_obs$TIMESTAMP - 30*60 # central standard time
+
+# get hourly means from weather_obs and merge with metout
+weather_obs_hrly <- aggregate(weather_obs, by = list(format(weather_obs$TIMESTAMP, "%Y-%m-%d %H")), FUN = mean)
+metout$Group.1 <- format(metout$dates, "%Y-%m-%d %H")
+metout_weather <- merge(metout, weather_obs_hrly, all.x = TRUE)
+
+filename=paste("Figure S1.pdf",sep="") 
+pdf(filename,paper="A4",width=11,height=15) # doing this means you're going to make a pdf - comment this line out if you want to see them in R
+
+par(mfrow = c(4, 2)) # set up for 2 plots in 2 columns
+par(oma = c(2, 2, 2, 2) + 0.1) # margin spacing stuff
+par(mar = c(5, 5, 2, 1) + 0.1) # margin spacing stuff 
+par(mgp = c(3, 1, 0) ) # margin spacing stuff
+
+# plot air temperature test results
+
+plot(metout_weather$dates, metout_weather$TAREF, main='1.2 m weather station air temperature', type = 'l', xlim = xlims, ylim = c(-10,70), ylab = bquote(paste('air temperature (', ~degree~C,')')), xlab ='date')
+lines(metout_weather$dates, metout_weather$AirTemp_C_Avg, col = addTrans("red",150))
+
+# get fit of air temperature predictions and plot
+weather_obs_pred <- subset(metout_weather, is.na(metout_weather$AirTemp_C_Avg) == FALSE)
+r<-cor(weather_obs_pred$TAREF,weather_obs_pred$AirTemp_C_Avg)
+rmse = sqrt(mean(((weather_obs_pred$TAREF-weather_obs_pred$AirTemp_C_Avg)^2),na.rm=TRUE))
+
+x = -10:50
+plot(x,x, type = 'l', main='1.2 m weather station air temperature', ylab = bquote(paste('observed (', ~degree~C,')')), xlab = bquote(paste('predicted (', ~degree~C,')')))
+points(weather_obs_pred$TAREF,weather_obs_pred$AirTemp_C_Avg, col=addTrans("black",50), pch = 16)
+text(-5+6.5,46, "       r     rmse")
+text(-3.5+5,42, paste0(round(r,3),'   ',round(rmse,2)))
+
+# plot wind speed test results
+
+plot(metout_weather$dates, metout_weather$VREF, main='1.2 m weather station wind speed', type = 'l', xlim = xlims, ylim = c(0,10), ylab = "wind speed, m/s", xlab ='date')
+lines(metout_weather$dates, metout_weather$WindSpeed_ms_Avg, col = addTrans("red",150))
+# get fit of wind predictions and plot
+weather_obs_pred <- subset(metout_weather, is.na(metout_weather$WindSpeed_ms_Avg) == FALSE)
+r<-cor(weather_obs_pred$VREF,weather_obs_pred$WindSpeed_ms_Avg)
+rmse = sqrt(mean(((weather_obs_pred$VREF-weather_obs_pred$WindSpeed_ms_Avg)^2),na.rm=TRUE))
+
+x = 0:9
+plot(x,x, type = 'l', main='1.2 m weather station wind speed', ylab = "observed (m/s)", xlab = "predicted (m/s)")
+points(weather_obs_pred$VREF,weather_obs_pred$WindSpeed_ms_Avg, col=addTrans("black",50), pch = 16)
+text(2,9, "       r     rmse")
+text(2.25,8.3, paste0(round(r,3),'   ',round(rmse,2)))
+
+# plot relative humidity test results
+
+plot(metout_weather$dates, metout_weather$RH, main='1.2 m weather station relative humidity', type = 'l', xlim = xlims, ylim = c(0,100), ylab = "relative humidity (%)", xlab ='date')
+lines(metout_weather$dates, metout_weather$RH_Avg, col = addTrans("red",150))
+
+# get fit of humidity predictions and plot
+weather_obs_pred <- subset(metout_weather, is.na(metout_weather$RH_Avg) == FALSE)
+r<-cor(weather_obs_pred$RH,weather_obs_pred$RH_Avg)
+rmse = sqrt(mean(((weather_obs_pred$RH-weather_obs_pred$RH_Avg)^2),na.rm=TRUE))
+
+x = 0:100
+plot(x,x, type = 'l', main='1.2 m weather station air temperature humidity', ylab = "observed (%)", xlab = "predicted (%)")
+points(weather_obs_pred$RH,weather_obs_pred$RH_Avg, col=addTrans("black",50), pch = 16)
+text(23,95, "       r     rmse")
+text(25,88, paste0(round(r,3),'   ',round(rmse,2)))
+
+# plot solar radiation test results
+
+plot(metout_weather$dates, metout_weather$SOLR, main='weather station solar radiation', type = 'l', xlim = xlims, ylim = c(0,1200), ylab = "solar radiation (W/m2)", xlab ='date')
+lines(metout_weather$dates, metout_weather$Solar_Avg, col = addTrans("red",150))
+
+# get fit of solar radiation predictions and plot
+weather_obs_pred <- subset(metout_weather, is.na(metout_weather$Solar_Avg) == FALSE)
+r<-cor(weather_obs_pred$SOLR,weather_obs_pred$Solar_Avg)
+rmse = sqrt(mean(((weather_obs_pred$SOLR-weather_obs_pred$Solar_Avg)^2),na.rm=TRUE))
+
+x = 0:1200
+plot(x,x, type = 'l', main='weather station solar radiation', ylab = "observed (W/m2)", xlab = "predicted (W/m2)")
+points(weather_obs_pred$SOLR,weather_obs_pred$Solar_Avg, col=addTrans("black",50), pch = 16)
+text(250,1200, "       r     rmse")
+text(270,1100, paste0(round(r,3),'   ',round(rmse,2)))
+
+dev.off()
+
+filename=paste("Figure S2.pdf",sep="") 
+pdf(filename,paper="A4",width=11,height=15) # doing this means you're going to make a pdf - comment this line out if you want to see them in R
+
+par(mfrow = c(3, 2)) # set up for 2 plots in 2 columns
+par(oma = c(2, 2, 2, 2) + 0.1) # margin spacing stuff
+par(mar = c(5, 5, 2, 1) + 0.1) # margin spacing stuff 
+par(mgp = c(3, 1, 0) ) # margin spacing stuff
+
+#  surface soil temperature test
+
+# merge
+D0cm <- obs.surfaces
+D0cm$date_time <- as.POSIXct(D0cm$date_time, format = "%Y-%m-%d %H:%M:%S")
+D0cm <- aggregate(D0cm, by = list(format(D0cm$date_time, "%Y-%m-%d %H")), FUN = mean)
+soil2 <- soil
+soil2$Group.1 <- format(soil2$dates, "%Y-%m-%d %H")
+D0cm_obs.pred <- merge(soil2, D0cm, all.x = TRUE)
+
+# plot surface soil temperature test results
+
+plot(D0cm_obs.pred$dates, D0cm_obs.pred$D0cm, main='surface soil temperature', type = 'l', xlim = xlims, ylim = c(-10,70), ylab = bquote(paste('temperature (', ~degree~C,')')), xlab ='date')
+lines(D0cm_obs.pred$dates, D0cm_obs.pred$temperature, col = addTrans("red",150))
+
+# get fit of D0cm predictions and plot
+D0cm_obs_pred <- subset(D0cm_obs.pred, is.na(D0cm_obs.pred$temperature) == FALSE)
+r<-cor(D0cm_obs_pred$D0cm,D0cm_obs_pred$temperature)
+rmse = sqrt(mean(((D0cm_obs_pred$D0cm-D0cm_obs_pred$temperature)^2),na.rm=TRUE))
+
+x = -10:70
+plot(x,x, type = 'l', main='model fit', ylab = bquote(paste('observed (', ~degree~C,')')), xlab = bquote(paste('predicted (', ~degree~C,')')))
+points(D0cm_obs.pred$D0cm,D0cm_obs.pred$temperature, col=addTrans("black",50), pch = 16)
+text(11,60, "       r     rmse")
+text(11,54, paste0(round(r,3),'   ',round(rmse,2)))
+
+# 5cm soil temperature test
+
+# merge
+D5cm <- obs.5cms
+D5cm$date_time <- as.POSIXct(D5cm$date_time, format = "%Y-%m-%d %H:%M:%S")
+D5cm <- aggregate(D5cm, by = list(format(D5cm$date_time, "%Y-%m-%d %H")), FUN = mean)
+soil2 <- soil
+soil2$Group.1 <- format(soil2$dates, "%Y-%m-%d %H")
+D5cm_obs.pred <- merge(soil2, D5cm, all.x = TRUE)
+
+# plot 5cm soil temperature test results
+
+plot(D5cm_obs.pred$dates, D5cm_obs.pred$D5cm, main='5cm soil temperature', type = 'l', xlim = xlims, ylim = c(-10,70), ylab = bquote(paste('temperature (', ~degree~C,')')), xlab ='date')
+lines(D5cm_obs.pred$dates, D5cm_obs.pred$temperature, col = addTrans("red",150))
+
+# get fit of 5cm predictions and plot
+D5cm_obs_pred <- subset(D5cm_obs.pred, is.na(D5cm_obs.pred$temperature) == FALSE)
+r<-cor(D5cm_obs_pred$D5cm,D5cm_obs_pred$temperature)
+rmse = sqrt(mean(((D5cm_obs_pred$D5cm-D5cm_obs_pred$temperature)^2),na.rm=TRUE))
+
+x = -10:70
+plot(x,x, type = 'l', main='model fit', ylab = bquote(paste('observed (', ~degree~C,')')), xlab = bquote(paste('predicted (', ~degree~C,')')))
+points(D5cm_obs.pred$D5cm,D5cm_obs.pred$temperature, col=addTrans("black",50), pch = 16)
+text(11,60, "       r     rmse")
+text(11,54, paste0(round(r,3),'   ',round(rmse,2)))
+
+# 15cm soil temperature test
+
+# merge
+D15cm <- obs.15cms
+D15cm$date_time <- as.POSIXct(D15cm$date_time, format = "%Y-%m-%d %H:%M:%S")
+D15cm <- aggregate(D15cm, by = list(format(D15cm$date_time, "%Y-%m-%d %H")), FUN = mean)
+soil2 <- soil
+soil2$Group.1 <- format(soil2$dates, "%Y-%m-%d %H")
+D15cm_obs.pred <- merge(soil2, D15cm, all.x = TRUE)
+
+# plot 15 cm soil temperature test results
+
+plot(D15cm_obs.pred$dates, D15cm_obs.pred$D15cm, main='15cm soil temperature', type = 'l', xlim = xlims, ylim = c(-10,70), ylab = bquote(paste('temperature (', ~degree~C,')')), xlab ='date')
+lines(D15cm_obs.pred$dates, D15cm_obs.pred$temperature, col = addTrans("red",150))
+
+# get fit of 15cm predictions and plot
+D15cm_obs_pred <- subset(D15cm_obs.pred, is.na(D15cm_obs.pred$temperature) == FALSE)
+r<-cor(D15cm_obs_pred$D15cm,D15cm_obs_pred$temperature)
+rmse = sqrt(mean(((D15cm_obs_pred$D15cm-D15cm_obs_pred$temperature)^2),na.rm=TRUE))
+
+x = -10:70
+plot(x,x, type = 'l', main='model fit', ylab = bquote(paste('observed (', ~degree~C,')')), xlab = bquote(paste('predicted (', ~degree~C,')')))
+points(D15cm_obs.pred$D15cm,D15cm_obs.pred$temperature, col=addTrans("black",50), pch = 16)
+text(11,60, "       r     rmse")
+text(11,54, paste0(round(r,3),'   ',round(rmse,2)))
+
+# 30cm soil temperature test
+
+# merge
+D30cm <- obs.30cms
+D30cm$date_time <- as.POSIXct(D30cm$date_time, format = "%Y-%m-%d %H:%M:%S")
+D30cm <- aggregate(D30cm, by = list(format(D30cm$date_time, "%Y-%m-%d %H")), FUN = mean)
+soil2 <- soil
+soil2$Group.1 <- format(soil2$dates, "%Y-%m-%d %H")
+D30cm_obs.pred <- merge(soil2, D30cm, all.x = TRUE)
+
+# plot 30cm soil temperature test results
+
+plot(D30cm_obs.pred$dates, D30cm_obs.pred$D30cm, main='30cm soil temperature', type = 'l', xlim = xlims, ylim = c(-10,70), ylab = bquote(paste('temperature (', ~degree~C,')')), xlab ='date')
+lines(D30cm_obs.pred$dates, D30cm_obs.pred$temperature, col = addTrans("red",150))
+
+# get fit of 30cm predictions and plot
+D30cm_obs_pred <- subset(D30cm_obs.pred, is.na(D30cm_obs.pred$temperature) == FALSE)
+r<-cor(D30cm_obs_pred$D30cm,D30cm_obs_pred$temperature)
+rmse = sqrt(mean(((D30cm_obs_pred$D30cm-D30cm_obs_pred$temperature)^2),na.rm=TRUE))
+
+x = -10:70
+plot(x,x, type = 'l', main='model fit', ylab = bquote(paste('observed (', ~degree~C,')')), xlab = bquote(paste('predicted (', ~degree~C,')')))
+points(D30cm_obs.pred$D30cm,D30cm_obs.pred$temperature, col=addTrans("black",50), pch = 16)
+text(11,60, "       r     rmse")
+text(11,54, paste0(round(r,3),'   ',round(rmse,2)))
+
+# plot 50cm soil temperature test results
+
+# merge
+D50cm <- obs.50cms
+D50cm$date_time <- as.POSIXct(D50cm$date_time, format = "%Y-%m-%d %H:%M:%S")
+D50cm <- aggregate(D50cm, by = list(format(D50cm$date_time, "%Y-%m-%d %H")), FUN = mean)
+soil2 <- soil
+soil2$Group.1 <- format(soil2$dates, "%Y-%m-%d %H")
+D50cm_obs.pred <- merge(soil2, D50cm, all.x = TRUE)
+
+# plot 50cm soil temperature test results
+
+plot(D50cm_obs.pred$dates, D50cm_obs.pred$D50cm, main='50cm soil temperature', type = 'l', xlim = xlims, ylim = c(-10,70), ylab = bquote(paste('temperature (', ~degree~C,')')), xlab ='date')
+lines(D50cm_obs.pred$dates, D50cm_obs.pred$temperature, col = addTrans("red",150))
+
+# get fit of 50cm predictions and plot
+D50cm_obs_pred <- subset(D50cm_obs.pred, is.na(D50cm_obs.pred$temperature) == FALSE)
+r<-cor(D50cm_obs_pred$D50cm,D50cm_obs_pred$temperature)
+rmse = sqrt(mean(((D50cm_obs_pred$D50cm-D50cm_obs_pred$temperature)^2),na.rm=TRUE))
+
+x = -10:70
+plot(x,x, type = 'l', main='model fit', ylab = bquote(paste('observed (', ~degree~C,')')), xlab = bquote(paste('predicted (', ~degree~C,')')))
+points(D50cm_obs.pred$D50cm,D50cm_obs.pred$temperature, col=addTrans("black",50), pch = 16)
+text(11,60, "       r     rmse")
+text(11,54, paste0(round(r,3),'   ',round(rmse,2)))
+
+# soil 100cm test
+
+# merge
+D100cm <- obs.1ms
+D100cm$date_time <- as.POSIXct(D100cm$date_time, format = "%Y-%m-%d %H:%M:%S")
+D100cm <- aggregate(D100cm, by = list(format(D100cm$date_time, "%Y-%m-%d %H")), FUN = mean)
+soil2 <- soil
+soil2$Group.1 <- format(soil2$dates, "%Y-%m-%d %H")
+D100cm_obs.pred <- merge(soil2, D100cm, all.x = TRUE)
+
+# plot 100cm soil temperature test results
+
+plot(D100cm_obs.pred$dates, D100cm_obs.pred$D100cm, main='100cm soil temperature', type = 'l', xlim = xlims, ylim = c(-10,70), ylab = bquote(paste('temperature (', ~degree~C,')')), xlab ='date')
+lines(D100cm_obs.pred$dates, D100cm_obs.pred$temperature, col = addTrans("red",150))
+
+# get fit of 100cm predictions and plot
+D100cm_obs_pred <- subset(D100cm_obs.pred, is.na(D100cm_obs.pred$temperature) == FALSE)
+r<-cor(D100cm_obs_pred$D100cm,D100cm_obs_pred$temperature)
+rmse = sqrt(mean(((D100cm_obs_pred$D100cm-D100cm_obs_pred$temperature)^2),na.rm=TRUE))
+
+x = -10:70
+plot(x,x, type = 'l', main='model fit', ylab = bquote(paste('observed (', ~degree~C,')')), xlab = bquote(paste('predicted (', ~degree~C,')')))
+points(D100cm_obs.pred$D100cm,D100cm_obs.pred$temperature, col=addTrans("black",50), pch = 16)
+text(11,60, "       r     rmse")
+text(11,54, paste0(round(r,3),'   ',round(rmse,2)))
+
+dev.off()
+
+filename=paste("Figure 2.pdf",sep="") 
+pdf(filename,paper="A4",width=11,height=15) # doing this means you're going to make a pdf - comment this line out if you want to see them in R
+
+par(mfrow = c(3, 2)) # set up for 2 plots in 2 columns
+par(oma = c(2, 2, 2, 2) + 0.1) # margin spacing stuff
+par(mar = c(5, 5, 2, 1) + 0.1) # margin spacing stuff 
+par(mgp = c(3, 1, 0) ) # margin spacing stuff
+
+# surface burrow temperature test
+
+# merge
+surf <- obs.burrow.surf
+surf$date_time <- as.POSIXct(surf$date_time, format = "%Y-%m-%d %H:%M:%S")
+surf$date_time <- surf$date_time - 30 * 60
+surf <- aggregate(surf, by = list(format(surf$date_time, "%Y-%m-%d %H")), FUN = mean)
+soil2 <- soil
+soil2$Group.1 <- format(soil2$dates, "%Y-%m-%d %H")
+surf_obs.pred <- merge(soil2, surf, all.x = TRUE)
+
+# plot surface burrow temperature test results
+
+plot(surf_obs.pred$dates, surf_obs.pred$D10cm, main='a) surface burrow temperature', type = 'l', xlim = xlims, ylim = c(10,50), ylab = bquote(paste('temperature (', ~degree~C,')')), xlab ='date')
+lines(surf_obs.pred$dates, surf_obs.pred$temperature, col = addTrans("red",150))
+
+# get fit of surface predictions and plot
+surf_obs_pred <- subset(surf_obs.pred, is.na(surf_obs.pred$temperature) == FALSE)
+r<-cor(surf_obs_pred$D10cm,surf_obs_pred$temperature)
+rmse = sqrt(mean(((surf_obs_pred$D10cm-surf_obs_pred$temperature)^2),na.rm=TRUE))
+# 
+# x = -10:60
+# plot(x,x, type = 'l', ylab = bquote(paste('observed (', ~degree~C,')')), xlab = bquote(paste('predicted (', ~degree~C,')')))
+# points(surf_obs_pred$D10cm,surf_obs_pred$temperature, col=addTrans("black",50), pch = 16)
+text(as.POSIXct("7/11/2013", format = "%d/%m/%Y"),50, "       r     rmse")
+text(as.POSIXct("7/11/2013", format = "%d/%m/%Y"),47.5, paste0(round(r,3),'   ',round(rmse,2)))
+
+# surface burrow humidity test
+
+humid2 <- humid
+humid2[,4:13] <- humid2[,4:13] * 100
+humid2$Group.1 <- format(humid2$dates, "%Y-%m-%d %H")
+surf_obs.pred <- merge(humid2, surf, all.x = TRUE)
+
+# plot surface humidity test results
+
+plot(surf_obs.pred$dates, surf_obs.pred$RH10cm, main='d) surface burrow humidity', type = 'l', xlim = xlims, ylim = c(0,100), ylab = 'relative humidity (%)', xlab ='date')
+lines(surf_obs.pred$dates, surf_obs.pred$humidity, col = addTrans("red",150))
+
+# get fit of surface humidity predictions and plot
+surf_obs_pred <- subset(surf_obs.pred, is.na(surf_obs.pred$humidity) == FALSE)
+r<-cor(surf_obs_pred$RH10cm,surf_obs_pred$humidity)
+rmse = sqrt(mean(((surf_obs_pred$RH10cm-surf_obs_pred$humidity)^2),na.rm=TRUE))
+
+#x = 0:100
+#plot(x,x, type = 'l', main='model fit',ylab = "observed (%)", xlab = "predicted (%)")
+#points(surf_obs_pred$RH10cm,surf_obs_pred$humidity, col=addTrans("black",50), pch = 16)
+text(as.POSIXct("7/11/2013", format = "%d/%m/%Y"),11, "       r     rmse")
+text(as.POSIXct("7/11/2013", format = "%d/%m/%Y"),4, paste0(round(r,3),'   ',round(rmse,2)))
+
+# mid burrow temperature test
+
+# merge
+mid <- obs.burrow.mid
+mid$date_time <- as.POSIXct(mid$date_time, format = "%Y-%m-%d %H:%M:%S")
+mid$date_time <- mid$date_time - 30 * 60
+mid <- aggregate(mid, by = list(format(mid$date_time, "%Y-%m-%d %H")), FUN = mean)
+soil2 <- soil
+soil2$Group.1 <- format(soil2$dates, "%Y-%m-%d %H")
+mid_obs.pred <- merge(soil2, mid, all.x = TRUE)
+
+# plot mid burrow temperature test results
+
+plot(mid_obs.pred$dates, mid_obs.pred$D30cm, main='b) mid burrow temperature', type = 'l', xlim = xlims, ylim = c(0,50), ylab = bquote(paste('temperature (', ~degree~C,')')), xlab ='date')
+lines(mid_obs.pred$dates, mid_obs.pred$temperature, col = addTrans("red",150))
+
+# get fit of mid burrow predictions and plot
+mid_obs_pred <- subset(mid_obs.pred, is.na(mid_obs.pred$temperature) == FALSE)
+r<-cor(mid_obs_pred$D30cm,mid_obs_pred$temperature)
+rmse = sqrt(mean(((mid_obs_pred$D30cm-mid_obs_pred$temperature)^2),na.rm=TRUE))
+
+# x = -10:60
+# plot(x,x, type = 'l', main='model fit', ylab = bquote(paste('observed (', ~degree~C,')')), xlab = bquote(paste('predicted (', ~degree~C,')')))
+# points(mid_obs_pred$D30cm,mid_obs_pred$temperature, col=addTrans("black",50), pch = 16)
+text(as.POSIXct("7/11/2013", format = "%d/%m/%Y"),50, "       r     rmse")
+text(as.POSIXct("7/11/2013", format = "%d/%m/%Y"),47.5, paste0(round(r,3),'   ',round(rmse,2)))
+
+# mid burrow humidity test
+
+# merge
+mid <- obs.burrow.mid
+mid$date_time <- as.POSIXct(mid$date_time, format = "%Y-%m-%d %H:%M:%S")
+mid$date_time <- mid$date_time - 30 * 60
+mid <- aggregate(mid, by = list(format(mid$date_time, "%Y-%m-%d %H")), FUN = mean)
+humid2 <- humid
+humid2[,4:13] <- humid2[,4:13] * 100
+humid2$Group.1 <- format(humid2$dates, "%Y-%m-%d %H")
+mid_obs.pred <- merge(humid2, mid, all.x = TRUE)
+
+# plot mid burrow humidity test results
+
+plot(mid_obs.pred$dates, mid_obs.pred$RH30cm, main='e) mid burrow humidity', type = 'l', xlim = xlims, ylim = c(0,100), ylab = 'relative humidity (%)', xlab ='date')
+lines(mid_obs.pred$dates, mid_obs.pred$humidity, col = addTrans("red",150))
+
+# get fit of mid burrow predictions and plot
+mid_obs_pred <- subset(mid_obs.pred, is.na(mid_obs.pred$humidity) == FALSE)
+r<-cor(mid_obs_pred$RH30cm,mid_obs_pred$humidity)
+rmse = sqrt(mean(((mid_obs_pred$RH30cm-mid_obs_pred$humidity)^2),na.rm=TRUE))
+
+#x = 0:100
+#plot(x,x, type = 'l', main='model fit', ylab = "observed (%)", xlab = "predicted (%)")
+#points(mid_obs_pred$RH30cm,mid_obs_pred$humidity, col=addTrans("black",50), pch = 16)
+text(as.POSIXct("7/11/2013", format = "%d/%m/%Y"),11, "       r     rmse")
+text(as.POSIXct("7/11/2013", format = "%d/%m/%Y"),4, paste0(round(r,3),'   ',round(rmse,2)))
+
+# deep burrow temperature test
+
+# merge
+deep <- obs.burrow.deep
+deep$date_time <- as.POSIXct(deep$date_time, format = "%Y-%m-%d %H:%M:%S")
+deep$date_time <- deep$date_time - 30 * 60
+deep <- aggregate(deep, by = list(format(deep$date_time, "%Y-%m-%d %H")), FUN = mean)
+soil2 <- soil
+soil2$Group.1 <- format(soil2$dates, "%Y-%m-%d %H")
+deep_obs.pred <- merge(soil2, deep, all.x = TRUE)
+
+# plot deep burrow temperature test results
+
+plot(deep_obs.pred$dates, deep_obs.pred$D50cm, main='c) deep burrow temperature', type = 'l', xlim = xlims, ylim = c(0,50), ylab = bquote(paste('temperature (', ~degree~C,')')), xlab ='date')
+lines(deep_obs.pred$dates, deep_obs.pred$temperature, col = addTrans("red",150))
+
+# get fit of deep burrow predictions and plot
+deep_obs_pred <- subset(deep_obs.pred, is.na(deep_obs.pred$temperature) == FALSE)
+r<-cor(deep_obs_pred$D50cm,deep_obs_pred$temperature)
+rmse = sqrt(mean(((deep_obs_pred$D50cm-deep_obs_pred$temperature)^2),na.rm=TRUE))
+
+# x = -10:60
+# plot(x,x, type = 'l', main='model fit', ylab = bquote(paste('observed (', ~degree~C,')')), xlab = bquote(paste('predicted (', ~degree~C,')')))
+# points(deep_obs_pred$D50cm,deep_obs_pred$temperature, col=addTrans("black",50), pch = 16)
+text(as.POSIXct("7/11/2013", format = "%d/%m/%Y"),50, "       r     rmse")
+text(as.POSIXct("7/11/2013", format = "%d/%m/%Y"),47.5, paste0(round(r,3),'   ',round(rmse,2)))
+
+# deep burrow humidity test
+
+# merge
+deep <- obs.burrow.deep
+deep$date_time <- as.POSIXct(deep$date_time, format = "%Y-%m-%d %H:%M:%S")
+deep$date_time <- deep$date_time - 30 * 60
+deep <- aggregate(deep, by = list(format(deep$date_time, "%Y-%m-%d %H")), FUN = mean)
+humid2 <- humid
+humid2[,4:13] <- humid2[,4:13] * 100
+humid2$Group.1 <- format(humid2$dates, "%Y-%m-%d %H")
+deep_obs.pred <- merge(humid2, deep, all.x = TRUE)
+
+# plot deep burrow humidity test results
+
+plot(deep_obs.pred$dates, deep_obs.pred$RH50cm, main='f) deep burrow humidity', type = 'l', xlim = xlims, ylim = c(0,100), ylab = 'relative humidity (%)', xlab ='date')
+lines(deep_obs.pred$dates, deep_obs.pred$humidity, col = addTrans("red",150))
+
+# get fit of deep burrow predictions and plot
+deep_obs_pred <- subset(deep_obs.pred, is.na(deep_obs.pred$humidity) == FALSE)
+r<-cor(deep_obs_pred$RH50cm,deep_obs_pred$humidity)
+rmse = sqrt(mean(((deep_obs_pred$RH50cm-deep_obs_pred$humidity)^2),na.rm=TRUE))
+
+#x = 0:100
+#plot(x,x, type = 'l', main='model fit', ylab = "observed (%)", xlab = "predicted (%)")
+#points(deep_obs_pred$RH50cm,deep_obs_pred$humidity, col=addTrans("black",50), pch = 16)
+text(as.POSIXct("7/11/2013", format = "%d/%m/%Y"),11, "       r     rmse")
+text(as.POSIXct("7/11/2013", format = "%d/%m/%Y"),4, paste0(round(r,3),'   ',round(rmse,2)))
+dev.off()
+```

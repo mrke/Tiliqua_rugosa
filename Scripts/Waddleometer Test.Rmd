@@ -1,0 +1,421 @@
+---
+title: "Waddleometer test: Comparison of observed and predicted (waddleometer) body activity, body temperature and body mass"
+author: "Michael Kearney"
+date: "`r Sys.Date()`"
+output: pdf_document
+classoption: landscape
+vignette: >
+  %\VignetteIndexEntry{Waddleometer test: Comparison of observed and predicted (waddleometer) body activity, body temperature and body mass}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+ eval = TRUE, tidy.opts = list(width.cutoff = 60), tidy = TRUE  
+)
+```
+
+## Overview
+
+This document reads in the output produced by the file "Tiliqua rugosa simulation at Bundey Bore.Rmd" and the observed $T_b$, step count and body mass and compares them for each lizard in 2009 and 2010. It saves the summary statistics (correlation coefficient, root mean square error and confusion matrix) to files in the folder 'waddle test'. 
+
+## Set up simulation and load the input data
+
+```{r}
+# First load the necessary packages and functions
+
+library(NicheMapR)
+library(raster)
+library(dismo)
+library(knitr)
+library(mda)
+source('addTrans.R') # function for making transparent plots
+
+# Read in ectotherm model simulation
+
+load('ecto.Rda')
+
+ystart <- 1991# start year
+yfinish <- 2010# end year
+nyears<-yfinish - ystart+1# integer, number of years for which to run the microclimate model
+
+# extract ectotherm model output
+metout <- as.data.frame(ecto$metout)
+shadmet <- as.data.frame(ecto$shadmet)
+soil <- as.data.frame(ecto$soil)
+shadsoil <- as.data.frame(ecto$shadsoil)
+rainfall <- as.data.frame(ecto$RAINFALL)
+foodwaters <- as.data.frame(ecto$foodwaters)
+foodlevels <- as.data.frame(ecto$foodlevels)
+environ <- as.data.frame(ecto$environ)
+enbal <- as.data.frame(ecto$enbal)
+masbal <- as.data.frame(ecto$masbal)
+humid <- as.data.frame(ecto$humid)
+debout <- as.data.frame(ecto$debout)
+yearout <- as.data.frame(ecto$yearout)
+foodwaters <- as.data.frame(ecto$foodwaters)
+foodlevels <- as.data.frame(ecto$foodlevels)
+yearsout <- as.data.frame(ecto$yearsout)
+environ<-cbind(environ, metout$SOLR) # add solar radiation
+colnames(environ)[ncol(environ)] <- "Solar"
+
+# append dates
+tzone <- paste("Etc/GMT-",10, sep = "") # doing it this way ignores daylight savings!
+dates <- seq(ISOdate(ystart, 1, 1, tz = tzone)-3600*12, ISOdate((ystart+nyears),1, 1, tz = tzone)-3600*13, by = "hours")
+dates <- subset(dates, format(dates, "%m/%d")!= "02/29") # remove leap years
+dates2 <- seq(ISOdate(ystart, 1, 1, tz = tzone)-3600*12, ISOdate((ystart+nyears),1, 1, tz = tzone)-3600*13, by = "days") 
+dates2 <- subset(dates2, format(dates2, "%m/%d")!= "02/29") # remove leap years
+
+debout <- as.data.frame(cbind(dates, debout))
+environ <- as.data.frame(cbind(dates, environ))
+masbal <- as.data.frame(cbind(dates, masbal))
+enbal <- as.data.frame(cbind(dates, enbal))
+soil <- as.data.frame(cbind(dates, soil))
+metout <- as.data.frame(cbind(dates, metout))
+shadsoil <- as.data.frame(cbind(dates, shadsoil))
+shadmet <- as.data.frame(cbind(dates, shadmet))
+rainfall <- as.data.frame(cbind(dates2, rainfall))
+colnames(rainfall) <- c("dates", "rainfall")
+```
+
+## Ectotherm model parameters
+
+```{r, fig.width = 18, fig.height = 13, echo = FALSE, warning = FALSE, message = FALSE, include = TRUE}
+# Thermal physiology and behaviour.
+
+TEMERGE <- 8.5 # min Tb at which they will attempt to leave retreat, from Kerr and Bull (2004)
+TBASK <- 26 # min Tb at which leaves retreat, from Pamula (1997) Table 3.14
+VTMIN <- 26 # minimum Tb at which activity occurs, from Pamula (1997) Table 3.42
+VTMAX <- 39 # maximum Tb at which activity occurs, from Pamula (1997) Table 3.42
+TPREF <- 33.5 # preferred Tb (will try and regulate to this), from Pamula (1997) Table 3.14
+ctmax <- 39 # critical thermal minimum - set to same as VTmax
+ctmin <- 3.5 # critical thermal maximum, from Bennet and John-Alder (1986)
+mindepth <- 3 # min depth (node, 1-10) allowed
+shdburrow <- 1 # use shady retreats only in hot weather
+
+# DEB model settings.
+
+# load the estimated DEB pars from the estimation procedure previously run in matlab.
+debpars <- as.data.frame(read.csv('DEB model/DEB_pars_Tiliqua_rugosa.csv',header = FALSE))$V1 # read in DEB pars
+
+# set core parameters
+DEB <- 1
+z <- debpars[8] # zoom factor (cm)
+F_m <- 13290 # max spec searching rate (l/h.cm^2)
+kap_X <- debpars[11] # digestion efficiency of food to reserve (-)
+v <- debpars[13] / 24 # energy conductance (cm/h)
+kap <- debpars[14] # kappa, fraction of mobilised reserve to growth/maintenance (-)
+kap_R <- debpars[15] # reproduction efficiency (-)
+p_M <- debpars[16] / 24 # specific somatic maintenance (J/cm3)
+k_J <- debpars[18] / 24 # maturity maint rate coefficient (1/h)
+E_G <- debpars[19] # specific cost for growth (J/cm3)
+E_Hb <- debpars[20] # maturity at birth (J)
+E_Hp <- debpars[21] # maturity at puberty (J)
+h_a <- debpars[22] * 10 ^ -1 /(24 ^ 2) # Weibull aging acceleration (1/h^2)
+s_G <- debpars[23] # Gompertz stress coefficient (-)
+
+# set thermal respose curve paramters
+T_REF <- debpars[1] - 273
+TA <- debpars[2] # Arrhenius temperature (K)
+TAL <- debpars[5] # low Arrhenius temperature (K)
+TAH <- debpars[6] # high Arrhenius temperature (K)
+TL <- debpars[3] # low temp boundary (K)
+TH <- debpars[4] # hight temp boundary (K)
+
+# set auxiliary parameters
+del_M <- debpars[9] # shape coefficient (-) 
+E_0 <- debpars[24] # energy of an egg (J)
+mh <- 1 # survivorship of hatchling in first year
+mu_E <- 585000 # molar Gibbs energy (chemical potential) of reserve (J/mol)
+```
+
+## Read in Mike Bull's data and merge with predictions
+
+```{r}
+massdata <- read.csv('waddleometer/Church_site_mass_length_noJan2010.csv')
+threshold.act <- 50 # threshold steps for counting as active
+
+#Subset to 2009-2010 and frame-shift by half an hour to account for 1/2 hr time difference in South Australia
+
+merge <- as.data.frame(paste(with(environ, as.numeric(format(dates, "%Y"))),"_",with(environ, as.numeric(format(dates, "%m"))),"_",with(environ, as.numeric(format(dates, "%d"))),"_",environ$TIME-1, sep = ""))
+colnames(merge) <- 'merge'
+environ2 <- cbind(environ, merge)
+environ3 <- environ2
+environ4 <- subset(environ3, format(dates,"%Y")>=2009)
+environ5 <- environ4
+for(l in 1:nrow(environ4)){ # make values average of prev hour to account for 1/2 time diff in SA
+  if(l==nrow(environ4)){
+    environ5[l, 6] <- environ4[l, 6]
+  }else{
+    environ5[l, 6] <- environ5[l, 6]+(environ4[l+1, 6]-environ4[l, 6])/2
+  }
+}
+```
+
+## Loop through and plot
+
+For each individual, 
+
+```{r, fig.width = 18, fig.height = 13, echo = FALSE, warning = FALSE, message = FALSE, include = TRUE}
+# Loop through and plot
+
+source('getwaddle.R') # function to read in waddleometer data for particular lizard
+source('aggwaddle.R') # function to aggregate waddleometer data from 2m to hourly
+
+par(mfrow = c(2, 2)) # set up for 2 plots in 2 columns
+par(oma = c(2, 2, 2, 2) + 0.1) # margin spacing stuff
+par(mar = c(3, 5, 1, 1) + 0.1) # margin spacing stuff 
+par(mgp = c(3, 1, 0) ) # margin spacing stuff
+
+# start big loop to summarise all lizards, create Appendix 1 figs
+
+yearstodo <- c(2009, 2010)
+for(m in 1:2){ # loop through each year
+  yeartodo <- yearstodo[m] # choose current year
+  k <- 0 # counter
+  curyear <- yearstodo[m]
+  plotrainfall <- subset(rainfall, substr(dates, 1, 4) == yeartodo) # get rainfall
+  environ_bask <- subset(environ5,  subset = (ACT >= 1 & TC >= TBASK & substr(dates, 1, 4) == yeartodo)) # get basking hrs
+  environ_forage <- subset(environ5,  subset = (ACT > 1 & substr(dates, 1, 4) == yeartodo))  # get foraging hrs
+  environ_night <- subset(metout,  subset = (ZEN == 90)) # get night hours
+  environ_night$TIME <- environ_night$TIME / 60 - 1 # convert from mins to hrs
+  doy2 <- strptime(format(plotrainfall$dates, "%y/%m/%d"), "%y/%m/%d")$yday + 1 # get simulation day of year
+  plotrainfall2 <- cbind(doy2, plotrainfall) # append day of year to rainfall data
+  colnames(plotrainfall2) <- c("JULDAY", "dates", "RAINFALL")
+  # create body condition vector      
+  desic <- subset(debout, TIME == 24 & substr(dates, 1, 4) == curyear) 
+  desic <- as.data.frame(cbind(desic[,2], desic[,20]))
+  colnames(desic) <- c('day', 'desic')
+  
+  for(i in 1:121){ # loop through all lizards
+
+   waddledata <- get_waddle(i)
+   sleepy <- waddledata$sleepy
+   curyear <- waddledata$curyear
+   sexlizard <- waddledata$sexlizard
+   date_waddle <- waddledata$date_waddle
+   sleepy_id <- waddledata$sleepy_id
+   
+    if(curyear==yeartodo){ # if individual's year and current year match, do the calcs
+      k <- k+1 # increment counter
+      doy2 <- strptime(format(plotrainfall$dates, "%y/%m/%d"), "%y/%m/%d")$yday + 1 # get simulation day of year
+      plotrainfall2 <- cbind(doy2, plotrainfall) # append day of year to rainfall data
+      colnames(plotrainfall2) <- c("JULDAY", "dates", "RAINFALL")
+      # create body condition vector      
+      desic <- subset(debout, TIME == 24 & substr(dates, 1, 4) == curyear) 
+      desic <- as.data.frame(cbind(desic[,2], desic[,20]))
+      colnames(desic) <- c('day', 'desic')
+      
+      # aggregate sleepy lizard data by hour
+      sleepy <-  aggwaddle(sleepy)
+      
+      # create new sleepy dataset for merging
+      sleepy2 <- sleepy
+      sleepy2$merge <- date_waddle$Group.1
+      #sleepy2$Temperature <- as.factor(sleepy$Temperature)
+      
+      # now merge sleepy dataset with environ dataset and 
+      correl <- merge(sleepy2, environ5, by = 'merge')
+      correl_day <- subset(correl, ZEN != 90) # remove nighttime hours
+      correl2 <- correl[, c(2, 3, 6, 7, 8, 9, 4, 5, 15, 19, 16)]
+      colnames(correl2) <- c('date','doy','year','month','day','hour','Tb_obs','steps','Tb_pred','act','shade')
+      correl2.day <- correl_day[, c(2, 3, 6, 7, 8, 9, 4, 5, 15, 19, 16)]
+      colnames(correl2.day) <- colnames(correl2)
+      
+      # get summary stats of Tb
+      mean_Tb_obs <- mean(correl2$Tb_obs, na.rm = TRUE)
+      max_Tb_obs <- max(correl2$Tb_obs, na.rm = TRUE)
+      min_Tb_obs <- min(correl2$Tb_obs, na.rm = TRUE)
+      med_Tb_obs <- median(correl2$Tb_obs, na.rm = TRUE)
+      mean_Tb_pred <- mean(correl2$Tb_pred, na.rm = TRUE)
+      max_Tb_pred <- max(correl2$Tb_pred, na.rm = TRUE)
+      min_Tb_pred <- min(correl2$Tb_pred, na.rm = TRUE)
+      med_Tb_pred <- median(correl2$Tb_pred, na.rm = TRUE)
+      
+      # do linear regression and correlation
+      lm_Tb <- with(correl2, (lm(Tb_pred ~ Tb_obs)))
+      r_Tb <- with(correl2, cor(Tb_pred, Tb_obs))
+      lm_Tb_R2 <- summary(lm_Tb)$r.squared
+      lm_Tb_rmsd <- sqrt(mean(((correl2$Tb_obs - correl2$Tb_pred)^2), na.rm = TRUE))
+      
+      # compute confusion matrix for 24hr activity predictions
+      act.obs <- ifelse(correl2$steps > threshold.act, 1, 0)
+      act.pred <- ifelse(correl2$act > 0, 1, 0)
+      confus <- confusion(act.obs, act.pred)
+      error <- attributes(confus)
+      confusion <- as.data.frame(t(as.data.frame(c(confus[1:4], error$error))))
+      rownames(confusion) <- NULL
+      colnames(confusion) <- c('true-', 'false-', 'true+', 'false+', 'err')
+      
+      # compute confusion matrix for daytime activity predictions
+      act.obs.day <- ifelse(correl2.day$steps > threshold.act, 1, 0)
+      act.pred.day <- ifelse(correl2.day$act > 0, 1, 0)
+      confus.day <- confusion(act.obs.day, act.pred.day)
+      error.day <- attributes(confus.day)
+      confusion.day <- as.data.frame(t(as.data.frame(c(confus.day[1:4], error.day$error))))
+      rownames(confusion.day) <- NULL
+      colnames(confusion.day) <- c('true-','false-','true+','false+','err')
+      
+      # find times when lizards were moving and not moving
+      plotlizard_forage <- subset(sleepy,  subset = (Steps > threshold.act))
+      plotlizard_noforage <- subset(sleepy,  subset = (Steps >= 0))
+      if(k == 1){
+        allforage <- cbind(plotlizard_forage, sexlizard)
+        allnoforage <- plotlizard_noforage
+        correl_all=correl2
+      }else{
+        allforage <- rbind(allforage, cbind(plotlizard_forage, sexlizard))
+        allnoforage <- rbind(allnoforage, plotlizard_noforage)
+        correl_all=rbind(correl_all,correl2)
+      }
+      
+      # plot activity window, observed and predicted
+      
+      # limit activity window plot to time when data is available
+      startdy <- 240
+      finishdy <- 365
+      
+      # base plot, with times when data was available for a given lizard indicted 
+      with(subset(plotlizard_noforage, Hours == 23), {plot(Hours+2~doy, xlim = c(startdy, finishdy),ylim = c(0, 25),xlab = "",ylab = "",cex = 1.25, pch = 15, col = 'black', cex.axis = 1.5, cex.lab = 1.5)})
+      mtext(text = "hour of day",side = 2, padj = -3, cex = 1.25)
+      mtext(text = "day of year",side = 1, padj = 3, cex = 1.25)
+      
+      # plot night hours
+      with(environ_night, {points(TIME+2~JULDAY, xlim = c(startdy, finishdy), ylim = c(0, 25), xlab = "day of year", ylab = "hour of day", cex = 0.5, col = "dark grey", pch = 16)})
+      
+      # plot basking hours      
+      with(environ_bask, {points(TIME~JULDAY, xlim = c(startdy, finishdy), ylim = c(0, 25),xlab = "day of year", ylab = "hour of day", cex = 1.,col = "light blue", pch = 15)})
+      
+      # plot foraging hours
+      with(environ_forage, {points(TIME~JULDAY, xlim = c(startdy, finishdy), ylim = c(0, 25), xlab = "day of year", ylab = "hour of day", cex = 1., col = "gold", pch = 15)})
+      
+      # plot observed foraging
+      with(plotlizard_forage, {points(Hours+1~doy, xlim = c(startdy, finishdy),ylim = c(0, 25),xlab = "day of year",ylab = "hour of day",cex = log(plotlizard_forage$Steps/300),pch = 15, col = addTrans("red",100))})
+      
+      # plot desiccation level and rainfall
+      with(desic, {points(desic~day, xlim = c(startdy, finishdy),ylim = c(0, 25),xlab = "day of year",ylab = "hour of day",lwd = 2, pch = 15, col = 'grey',type = 'l',lty = 2)})
+      with(plotrainfall2, {points(RAINFALL~JULDAY, type = "h",col = 'blue')})
+      
+      # now plot Tb trace through time
+      
+      # limit plot to time when data is available
+      daystart <- paste(substr(curyear, 3, 4), '/08/24',sep = "") # y/m/d
+      dayfin <- paste(substr(curyear, 3, 4), '/12/31',sep = "") # y/m/d
+      
+      # subset observed temps to observation window and ensure they are in date order
+      plotlizard <- subset(sleepy, format(sleepy$date_waddle, "%y/%m/%d") >= daystart & format(sleepy$date_waddle, "%y/%m/%d") <= dayfin)
+      plotlizard <- plotlizard[order(plotlizard$date_waddle),]
+      
+      # subset predicted lizard temps, condition and microclimate
+      plotpred <- subset(environ5, format(environ5$dates, "%y/%m/%d") >= daystart & format(environ5$dates, "%y/%m/%d") <= dayfin)
+      plotdeb <- subset(debout, format(debout$dates, "%y/%m/%d") >= daystart & format(environ$dates, "%y/%m/%d") <= dayfin)
+      plotmetout <- subset(metout, format(metout$dates, "%y/%m/%d")>= daystart & format(metout$dates, "%y/%m/%d") <= dayfin)
+      
+      # merge observed and predicted to avoid continuous line between sample gaps
+      plotlizard2 <- plotlizard
+      colnames(plotlizard2)[1] <- "dates"
+      plotlizard2 <- merge(plotlizard2, plotpred, all = TRUE)
+      
+      # plot predicted Tb trace
+      with(plotpred, {plot(TC~dates, type = "l",ylim = c(0, 40),ylab = "",xlab = "", cex.axis = 1.5, cex.lab = 1.5)})
+      mtext(text = expression(temperature~(degree*C)),side = 2, padj = -1.5, cex = 1.25)
+      mtext(text = "date",side = 1, padj = 3, cex = 1.25)
+      
+      # plot observed Tb
+      with(plotlizard2, {points(Temperature~dates, type = "l",col = addTrans("red",150))})
+      
+      # plot predicted desiccation level and rainfall
+      with(plotdeb, {points(Body_cond~dates, type = "l",col = 'grey',lty = 2, lwd = 2)})
+      with(plotrainfall2, {points(RAINFALL~dates, type = "h",col = 'blue')})
+      
+      # plot predicted body mass, excluding reproductive mass and subtracting away any mass lost as evaporation
+      
+      hydration_mass_female <- with(plotdeb,WETMASS - WETMASS * (Body_cond / 100))
+      hydration_mass_male <- with(plotdeb,WETMASS - (CUMREPRO+CUMBATCH) / mu_E*23.9 / 0.3 - WETMASS * (Body_cond / 100))
+      
+      if(sexlizard != "M"){
+        hydration_mass <- hydration_mass_female
+      }else{
+        hydration_mass <- hydration_mass_male
+      }
+      with(plotdeb,{plot(hydration_mass ~ dates, type = 'l', ylim = c(400, 1100),ylab = "", xlab = "", cex.axis = 1.5, cex.lab = 1.5)})
+      mtext(text = "mass, g",side = 2, padj = -3, cex = 1.25)
+      mtext(text = "date",side = 1, padj = 3, cex = 1.25)
+      
+      # plot observed mass
+      massobs <- subset(massdata, lizard_ID==sleepy_id)
+      date_mass <- as.POSIXct(with(massobs, ISOdatetime(year, month, day, 0, 0, 0)))
+      doymass <- strptime(format(date_mass, "%y/%m/%d"), "%y/%m/%d")$yday + 1
+      massobs <- cbind(massobs, date_mass, doymass)
+      with(massobs,{points(wgt~date_mass, type = 'p',col = 'red')})
+ hydration_mass_female <- with(plotdeb,WETMASS - WETMASS * (Body_cond / 100))
+      hydration_mass_male <- with(plotdeb,WETMASS - (CUMREPRO+CUMBATCH) / mu_E*23.9 / 0.3 - WETMASS * (Body_cond / 100))
+      
+      if(sexlizard != "M"){
+        hydration_mass <- hydration_mass_female
+      }else{
+        hydration_mass <- hydration_mass_male
+      }                  
+      dailymass_female <- aggregate(hydration_mass_female, by = list(format(plotdeb$dates, "%Y-%m-%d")), FUN = mean)
+      dailymass_male <- aggregate(hydration_mass_male, by = list(format(plotdeb$dates, "%Y-%m-%d")), FUN = mean) 
+      if(sexlizard == "M"){
+        dailymass <- dailymass_male
+      }else{
+        dailymass <- dailymass_female
+      }
+      
+      massobs2 <- massobs[order(as.Date(massobs$date.1, "%d/%m/%Y")),]
+      massobs2 <- massobs2[grep(as.character(curyear), massobs2$date.1),]
+      massobs2 <- cbind(massobs2, dailymass[which(dailymass$Group.1 %in% as.character(as.Date(as.character(massobs2$date.1), "%d/%m/%Y"))),2])
+      colnames(massobs2)[22] <- "PredMass"
+      
+      # plot
+      #x <- c(400:1000)
+      #plot(x,x, type = 'l', main='body condition',ylab = "observed mass, g", xlab = "predicted mass, g", ylim = c(400, 1000), cex.axis = 1.2, cex.lab = 1.2)
+      #points(massobs2$wgt ~ massobs2$PredMass, col = "black", pch = 16, cex = 1.5)
+      
+      # compute correlation coefficient and root mean square deviation
+      mass.r <- cor(massobs2$wgt[is.na(massobs2$wgt)==FALSE], massobs2$PredMass[is.na(massobs2$wgt)==FALSE])
+      mass.rmsd <- sqrt(mean(((massobs2$wgt-massobs2$PredMass) ^ 2),na.rm = TRUE))
+      mass.n <- nrow(massobs2)
+      # append to plot
+      #text(plotdeb$dates[1] + 3600*24*15,1000, "         r     rmsd", cex = 1.75)
+      #text(plotdeb$dates[1] + 3600*24*10,930, paste0('model fit ',round(mass.r),'   ',round(mass.rmsd, 2)))
+      text(plotdeb$dates[1] + 3600*24*10,970, paste("r = ",round(mass.r, 2),"\n","rmsd = ",round(mass.rmsd, 2),sep = ""), cex = 1.75)      
+      
+      # plot predicted vs. observed body temperature
+      with(correl2,(plot(Tb_pred~Tb_obs, ylim = c(0, 40),xlim = c(0, 40), xlab = "", ylab = "", cex.axis = 1.5, cex.lab = 1.5)))
+      mtext(text = expression('predicted T'[b]),side = 2, padj = -3, cex = 1.25)
+      mtext(text = expression('observed T'[b]),side = 1, padj = 3, cex = 1.25)
+      abline(0, 1)
+      text(5, 35, paste("r = ",round(r_Tb, 2),"\n","rmsd = ",round(lm_Tb_rmsd, 2),sep = ""), cex = 1.75)
+      title(main = paste(sleepy_id," sex =",sexlizard," ",curyear, sep = " "),outer = T, cex.main = 2)
+      cat('\r\n\r\n')      
+
+      # construct summary table
+      if(k==1){
+        summary <- as.data.frame(cbind(as.numeric(sleepy_id),sexlizard, curyear, mean_Tb_obs, mean_Tb_pred, max_Tb_obs, max_Tb_pred, min_Tb_obs, min_Tb_pred, med_Tb_obs, med_Tb_pred, r_Tb, lm_Tb_rmsd, confusion, confusion.day, mass.r, mass.rmsd, mass.n))
+      }else{
+        summary <- rbind(summary, as.data.frame(cbind(as.numeric(sleepy_id),sexlizard, curyear, mean_Tb_obs, mean_Tb_pred, max_Tb_obs, max_Tb_pred, min_Tb_obs, min_Tb_pred, med_Tb_obs, med_Tb_pred, r_Tb, lm_Tb_rmsd, confusion, confusion.day, mass.r, mass.rmsd, mass.n)))
+      } 
+    }
+  } #end loop through lizards
+  
+  colnames(summary) <- c('id','sex','year','mean_Tb_obs','mean_Tb_pred','max_Tb_obs','max_Tb_pred','min_Tb_obs','min_Tb_pred','med_Tb_obs','med_Tb_pred','Tb_r','Tb_rmsd','true-','false-','true+','false+','err','day.true-','day.false-','day.true+','day.false+','day.err', 'mass_R', 'mass_rmsd', 'mass_n')
+  
+  # write out summary table
+  if(yeartodo==2009){
+    write.csv(summary,'summary_nodrink_2009.csv')
+    write.csv(correl_all,'correl_all_2009.csv')
+    write.csv(allforage, 'allforage_2009.csv')
+    write.csv(allnoforage, 'allnoforage_2009.csv')
+  }else{
+    correl_all_2010=correl_all
+    write.csv(summary,'summary_nodrink_2010.csv')
+    write.csv(correl_all,'correl_all_2010.csv')
+    write.csv(allforage, 'allforage_2010.csv')
+    write.csv(allnoforage, 'allnoforage_2010.csv')    
+  }   
+}
+```

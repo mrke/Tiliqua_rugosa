@@ -1,0 +1,104 @@
+---
+title: "Tiliqua rugosa food availability and functional response estimation"
+author: "Michael Kearney"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Tiliqua rugosa food availability and functional response estimation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+ eval = TRUE, tidy.opts=list(width.cutoff=60), tidy=TRUE  
+)
+```
+
+## Overview
+
+This document estimates the food density and functional response parameters of *Tiliqua rugosa* based largely on Dubas and Bull (1991).
+
+## Food energy availability - assuming hydrated berries
+
+```{r}
+# energy content
+E_100g <- 397 # kJ/100g, native fruit (Brand-Miller & Holt, 1998)
+
+# energy per berry
+g_berry <- (4/3) * pi * 0.35 ^ 3 # volume of sphere, radius 0.35 cm for Tetragonia berry (Dubas and Bull, 1991), assumed density 1 g/cm3
+J_berry <- E_100g * 10 * g_berry # kJ/100g to J/g * g/berry
+
+# energy density
+dens_berry <- 200 # berries / m2, Dubas and Bull (1991)
+X <- dens_berry / 10000 * J_berry # energy density, J/cm2, per Tetragonia bush
+```
+
+## Stomach volume
+
+```{r}
+# read in DEB pars
+debpars=as.data.frame(read.csv('DEB model/DEB_pars_Tiliqua_rugosa.csv',header=FALSE))$V1 
+# get V and [E] for 0.65 grown animal, ~ 550 g (mean mass for Dubas and Bull (1991))
+E <- ((debpars[16]/24)*debpars[8]/debpars[14])/(debpars[13]/24) * 0.75 # initial reserve
+V <- (debpars[26] ^ 3) * 0.75 # cut down the initial structure to make it 350 g
+mu_E = 585000 # molar Gibbs energy (chemical potential) of reserve (J/mol)
+mass <- (E * V) / mu_E * 23.9 / 0.3 + V
+
+mass_stomach <- mass * 0.1 # g, assume approximately 10% of body mass following Barwick (1965) for Egernia cunninghami 
+energy_stomach <- mass_stomach * E_100g * 10 # energy content of stomach
+E_sm <- energy_stomach / V
+```
+
+## Ingestion rate
+
+```{r}
+feed_time <- mean(c(11.2, 14.5, 14.8)) # mins, mean feeding time per day, Dubas and Bull (1991)
+J_food_h <- energy_stomach / feed_time * 60 # Food intake rate, J / h at field active temp of 33.5 deg C
+F_m <- J_food_h / (V ^ (2 / 3)) # Food intake rate, J / cm2 / h at 33.5 deg C
+
+# get correction factor down to reference temp
+T_REF = debpars[1]-273
+TA = debpars[2] # Arrhenius temperature (K)
+TAL = debpars[5] # low Arrhenius temperature (K)
+TAH = debpars[6] # high Arrhenius temperature (K)
+TL = debpars[3] # low temp boundary (K)
+TH = debpars[4] # hight temp boundary (K)
+T_corr <- exp(TA*(1/(273.15+T_REF)-1/(273.15+33.5)))/(1+exp(TAL*(1/(273.15+33.5)-1/TL))+exp(TAH*(1/TH-1/(273.15+33.5)))) # correction from 20 to 33.5
+
+F_m_ref <- F_m / T_corr # reference rate, J / cm2 / h at 20 deg C
+```
+
+## Half saturation constant
+
+```{r}
+berries_h <- (mass_stomach / g_berry * (feed_time / 60)) # berries / h at 33.5 deg C
+F_dot <-  dens_berry * 10000 / berries_h  # cm2 / h at 33.5 deg C
+K <- berries_h * J_berry / F_dot # half saturation constant
+```
+
+## Plot functional response
+
+```{r}
+Xs <- c(0.1, seq(1, X)) # density from 0.1 to 14 J / cm2
+x <- Xs / K # scaled food density
+plot(x / (1 + x) ~ Xs, ylim = c(0,1))
+```
+
+## Write results to csv
+
+```{r}
+feedpars <- cbind(X, F_m_ref, K, E_sm)
+save(feedpars, file = 'feedpars.Rda') # save results for reading in later
+```
+
+## Literature Cited
+
+Barwick, R. E. 1965. Studies on the scincid lizard Egernia cunninghami (Gray, 1832). PhD thesis, Australian National University, Canberra.
+
+Brand-Miller, J., and S. Holt. 1998. Australian Aboriginal plant foods: A consideration of their nutritional composition and health implications. Nutrition Research Reviews 11:5-23.
+
+Dubas, G., and C. M. Bull. 1991. Diet choice and food availability in the omnivorous lizard, Trachydosaurus rugosus. Wildlife Research 18:147-155.
+

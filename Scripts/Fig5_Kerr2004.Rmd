@@ -1,0 +1,109 @@
+---
+title: "Prediction of Figure 5 hydration levels from Kerr & Bull 2004"
+author: "Michael Kearney"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Prediction of Figure 5 hydration levels from Kerr & Bull 2004}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+ eval = TRUE, tidy.opts=list(width.cutoff=60), tidy=TRUE  
+)
+```
+
+## Overview
+
+This study takes the results of the 'Tiliqua rugosa simulation at Bundey Bore.Rmd' simulation and subsets it for the 2002/2003 summer when Greg Kerr studied body condition changes at Bundey Bore during a drought period. The predicted non-reproductive body mass, accounting for dehydration, is predicted and compared to observed values. The correlation between observed and predicted body mass is also determined.
+
+## Extract results from ectotherm simulation and append dates
+
+```{r}
+load('ecto_nodepress.Rda')
+ecto_nodepress <- ecto
+load('ecto.Rda')
+rainfall <- as.data.frame(ecto$RAINFALL)
+debout <- as.data.frame(ecto$debout)
+debout_nodepress <- as.data.frame(ecto_nodepress$debout)
+foodwaters <- as.data.frame(ecto$foodwaters)
+foodlevels <- as.data.frame(ecto$foodlevels)
+
+# append dates
+ystart <- 1991 # start year
+yfinish <- 2010 # end year
+nyears <- yfinish - ystart + 1# integer, number of years for which to run the microclimate model
+tzone <- paste("Etc/GMT+", 10, sep="") 
+dates <- seq(ISOdate(ystart, 1, 1, tz = tzone) - 3600 * 12, ISOdate((ystart+nyears), 1, 1, tz=tzone) - 3600 * 13, by="hours")
+dates <- subset(dates, format(dates, "%m/%d")!= "02/29") # remove leap years
+dates2 <- seq(ISOdate(ystart,1,1,tz=tzone)-3600*12, ISOdate((ystart+nyears), 1, 1, tz = tzone) - 3600 * 13, by = "days") 
+dates2 <- subset(dates2, format(dates2, "%m/%d") != "02/29") # remove leap yearsdates=subset(dates, format(dates, "%m/%d")!= "02/29") # remove leap years
+
+debout <- as.data.frame(cbind(dates, debout))
+debout_nodepress <- as.data.frame(cbind(dates, debout_nodepress))
+rainfall <- as.data.frame(cbind(dates2, rainfall))
+colnames(rainfall) <- c("dates", "rainfall")
+```
+
+## Subset 2002/2003 data, compute non-reproductive, hydration-specific body mass
+
+```{r}
+plotdebout <- subset(debout, format(debout$dates, "%y") == "02" | format(debout$dates, "%y") == "03")
+plotdebout_nodepress <- subset(debout_nodepress, format(debout_nodepress$dates, "%y") == "02" | format(debout_nodepress$dates, "%y") == "03")
+plotfoodwaters <- subset(cbind(dates2, foodwaters),format(dates2, "%y") =="02" | format(dates2, "%y") == "03")
+plotfoodlevels <- subset(cbind(dates2, foodlevels),format(dates2, "%y") =="02" | format(dates2, "%y") == "03")
+# plot predicted body mass, excluding reproductive mass and subtracting away any mass lost as evaporation
+mu_E <- 585000 # molar Gibbs energy (chemical potential) of reserve (J/mol)
+hydration_mass_male <- plotdebout$WETMASS - (plotdebout$CUMREPRO + plotdebout$CUMBATCH) / mu_E * 23.9 / 0.3 - plotdebout$WETMASS * (plotdebout$Body_cond / 100)
+hydration_mass_female <- plotdebout$WETMASS - plotdebout$WETMASS * (plotdebout$Body_cond / 100)
+hydration_mass <- (hydration_mass_male + hydration_mass_female) / 2
+hydration_mass_male_nodepress <- plotdebout_nodepress$WETMASS - (plotdebout_nodepress$CUMREPRO + plotdebout_nodepress$CUMBATCH) / mu_E * 23.9 / 0.3 - plotdebout_nodepress$WETMASS * (plotdebout_nodepress$Body_cond / 100)
+hydration_mass_female_nodepress <- plotdebout_nodepress$WETMASS - plotdebout_nodepress$WETMASS * (plotdebout_nodepress$Body_cond / 100)
+hydration_mass_nodepress <- (hydration_mass_male_nodepress + hydration_mass_female_nodepress) / 2
+```
+
+## Plot observed and predicted trajectory of body mass with rainfall and plant water levels
+
+```{r}
+# read in Kerr & Bull 2004 Figure 5 body mass data.
+Kerr_fig5 <- read.csv("Kerr_Fig5.csv")
+date_Kerr <- with(Kerr_fig5, ISOdatetime(Year, Month, Day, 0, 0, 0))
+Kerr_fig5 <- cbind(date_Kerr, Kerr_fig5)
+
+plot(hydration_mass ~ plotdebout$dates, type = 'l', ylim = c(200, 800), ylab = "mass, g / rainfall / plant water", xlab = "", cex.axis = 1.2, cex.lab = 1.2, yaxs = 'i')
+points(hydration_mass_nodepress ~ plotdebout_nodepress$dates, type = 'l', cex.axis = 1.2, cex.lab = 1.2, yaxs = 'i', col = 'grey')
+with(Kerr_fig5, points(Mass ~ date_Kerr, type='p', col='red', pch = 16, cex = 1.2))
+points((plotfoodwaters$`ecto$foodwaters`*200+200) ~ plotfoodwaters$dates2, type = 'h', col = 'dark green', lwd = 2)
+points((rainfall$rainfall * 6 + 200) ~ rainfall$dates, type = 'h', col = 'blue')
+```
+
+## Correlate observed and predicted body mass
+
+```{r}
+# aggregate hourly to daily body mass and append to Kerr2004 data
+dailymass <- aggregate(hydration_mass, by = list(format(plotdebout$dates, "%Y-%m-%d")), FUN = mean)
+Kerr_fig5 <- cbind(Kerr_fig5, dailymass[which(dailymass$Group.1 %in% as.character(Kerr_fig5$date_Kerr)),2])
+colnames(Kerr_fig5)[8] <- "predMass"
+
+# plot
+x <- 300:800
+plot(x,x, type = 'l', main='body condition',ylab = "observed mass, g", xlab = "predicted mass, g", ylim = c(450,600), cex.axis = 1.2, cex.lab = 1.2)
+points(Kerr_fig5$Mass ~ Kerr_fig5$predMass, col = "black", pch = 16, cex = 1.5)
+
+# compute correlation coefficient and root mean square deviation
+r <- cor(Kerr_fig5$Mass, Kerr_fig5$predMass)
+p <- cor.test(Kerr_fig5$Mass, Kerr_fig5$predMass)$p.value
+rmsd <- sqrt(mean(((Kerr_fig5$Mass-Kerr_fig5$predMass) ^ 2),na.rm = TRUE))
+
+# append to plot
+text(390 + 9.5,590, "   r     rmsd   p")
+text(380 + 8.5,580, paste0('  ', round(r, 3),'   ',round(rmsd, 2),'  ', round(p, 3)))
+```
+
+## References
+
+Kerr, G. D., and C. M. Bull. 2004. Field observations of extended locomotor activity at sub-optimal body temperatures in a diurnal heliothermic lizard (Tiliqua rugosa). Journal of Zoology 264:179-188.

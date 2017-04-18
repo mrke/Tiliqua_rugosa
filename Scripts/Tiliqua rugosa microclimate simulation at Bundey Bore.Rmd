@@ -1,0 +1,280 @@
+---
+title: "Tiliqua rugosa microclimate simulation at Bundey Bore"
+author: "Michael Kearney"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Tiliqua rugosa microclimate simulation at Bundey Bore}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+ eval = TRUE, tidy.opts=list(width.cutoff=60), tidy=TRUE  
+)
+```
+
+## Overview
+
+This document runs a simulation of the microclimate at Bull's Bundey Bore study site.
+
+## Setup for the microclimate model
+
+First load the necessary packages.
+
+```{r}
+library(NicheMapR)
+library(raster)
+library(dismo)
+library(knitr)
+```
+
+Choose the site to simulate.
+
+```{r}
+spatial <- "w:/"
+longlat<-c(139.3109, -33.888) # Bundey Bore study site
+loc<-longlat
+```
+
+Specify the years to simulate
+
+```{r}
+ystart <- 1991# start year
+yfinish <- 2010# end year
+nyears<-yfinish-ystart+1# integer, number of years for which to run the microclimate model
+```
+
+Now set the soil properties. First retrieve soil properties from Soil and Landscape Grid of Australia (SLGA)
+
+```{r}
+prevdir<-getwd()
+setwd('x:')
+cmd<-paste("R --no-save --args ",longlat[1]," ",longlat[2]," < extract.R",sep='')
+system(cmd)
+soilpro<-read.csv('data.csv')
+setwd(prevdir)
+soilpro[,1]<-c(2.5,7.5,22.5,45,80,150)
+colnames(soilpro)[1] <- 'depth'
+```
+
+Now get hydraulic properties for this soil using Cosby et al. 1984 pedotransfer functions.
+
+```{r}
+DEP <- c(0., 1.,  3, 5.,  10,  15,  30.,  60.,  100.,  200.) # Soil nodes (cm)
+soil.hydro<-pedotransfer(soilpro = as.data.frame(soilpro), DEP = DEP)
+PE<-soil.hydro$PE
+BB<-soil.hydro$BB
+BD<-soil.hydro$BD
+KS<-soil.hydro$KS
+BulkDensity <- BD[seq(1,19,2)]*1000 #soil bulk density, kg/m3
+```
+
+Get qualitative soil type out of interest.
+
+```{r}
+# search through observed textures and find the nearest match to Campell and Norman's Table 9.1
+stypes<-NULL
+for(m in 1:nrow(soilpro)){
+  ssq<-(CampNormTbl9_1[,2]-soilpro[m,4]/100)^2 + (CampNormTbl9_1[,3]-soilpro[m,3]/100)^2
+  stypes[m]<-which(ssq==min(ssq))
+}
+
+# produce a table of the qualitative soil profile
+soils<-as.character(CampNormTbl9_1[,1])
+profile<-as.data.frame(cbind(soilpro[,1],soils[stypes]), stringsAsFactors=FALSE)
+profile[,1]<-as.numeric(profile[,1])
+colnames(profile)<-c("depth","soiltype")
+kable(profile)
+``` 
+
+```{r}
+Usrhyt <- 0.03 # m
+maxshade <- 50 # maximum simulated shade
+LAI <- 0.317 # mean for the site
+```
+
+Run the model and save the output as an R data file.
+
+```{r}
+micro<-micro_aust(loc = longlat, LAI = LAI, ystart = ystart, yfinish = yfinish, PE = PE, BB = BB, BD = BD, KS = KS, BulkDensity = BulkDensity, maxshade = maxshade, Usrhyt = Usrhyt, DEP = DEP, spatial = "W:/", ERR = 2.5)
+save(micro,file = 'microclimate/micro.Rda') # save output
+```
+
+Get Leaf Area Index
+
+```
+library(raster)
+library(ncdf4)
+setwd("c:/Spatial_Data/Soil and Vegetation/LAI")
+
+filelist<-list.files(full.names = TRUE)[-(1:2)] # list files, remove dates and first (incomplete) file
+dates<-read.csv('dates.csv', stringsAsFactors = FALSE)[,2]
+dates<-dates[-1]
+dates<-gsub('[.]', '-', dates)
+dates<-as.POSIXct(dates,format="%Y-%m-%d")
+tzone<-paste("Etc/GMT+",10,sep="") 
+dates2<-seq(ISOdate(2000,02,26,tz=tzone)-3600*12, ISOdate(as.numeric(substr(dates[length(dates)],1,4)),as.numeric(substr(dates[length(dates)],6,7)),as.numeric(substr(dates[length(dates)],9,10)),tz=tzone)-3600*13, by="days") 
+
+for(i in 1:length(filelist)){
+  a<-raster(filelist[i], varname = 'lai')
+  LAI<-raster::extract(a, cbind(longlat[1],longlat[2]))
+  if(i==1){
+    LAIs<-LAI
+  }else{
+    LAIs<-c(LAIs,LAI)
+  }
+  cat(i, '\n')
+}
+plot(LAIs~dates, type = 'l', main = "LAI, Bundey Bore", ylim = c(0,7))
+LAIdone<-cbind(as.data.frame(dates),LAIs, stringsAsFactors=FALSE)
+colnames(LAIdone)<-c("date","LAI")
+setwd("C:/Users/mrke/My Dropbox/Current Research Projects/Tiliqua rugosa")
+write.csv(LAIdone, 'LAI_Bundey.csv')
+text(dates2[1],7,paste0("mean ",round(mean(as.numeric(LAIs), na.rm=TRUE),1)))
+text(dates2[1],6.7,paste0("min ",round(min(as.numeric(LAIs), na.rm=TRUE),1)))
+```
+
+Compute monthly mean LAI.
+
+```{r}
+LAIs<-read.csv('LAI_Bundey.csv')[,3]
+dates<-as.POSIXct(read.csv('LAI_Bundey.csv')[,2],format="%Y-%m-%d")
+tzone<-paste("Etc/GMT+",10,sep="") 
+dates2<-seq(ISOdate(2000,02,26,tz=tzone)-3600*12, ISOdate(as.numeric(substr(dates[length(dates)],1,4)),as.numeric(substr(dates[length(dates)],6,7)),as.numeric(substr(dates[length(dates)],9,10)),tz=tzone)-3600*13, by="days") 
+
+months<-c("01","02","03","04","05","06","07","08","09","10","11","12")
+LAImon<-vector(length = 12)
+for(i in 1:length(months)){
+LAImon[i]<-mean(subset(LAIs, format(dates, "%m") == months[i]), na.rm=TRUE)
+}
+plot(LAImon)
+LAIfull<-rep(LAImon, nyears)
+dates2=seq(ISOdate(ystart,1,1,tz=tzone)-3600*12, ISOdate((ystart+nyears),1,1,tz=tzone)-3600*13, by="days") 
+dates2=subset(dates2, format(dates2, "%m/%d")!= "02/29") # remove leap yearsdates=subset(dates, 
+datesmonthly<-subset(dates2, format(dates2, "%d") == "15")
+LAI<-spline(x = datesmonthly, y = LAIfull, xout = dates2)$y
+plot(LAI~dates2, type = 'l')
+```
+
+Run the model and save the output as an R data file.
+
+```{r}
+micro<-micro_aust(loc = longlat, LAI = LAI, ystart = ystart, yfinish = yfinish, PE = PE, BB = BB, BD = BD, KS = KS, BulkDensity = BulkDensity, maxshade = maxshade, Usrhyt = Usrhyt, DEP = DEP, scenario = scenario, year = year, spatial = "W:/")
+save(micro,file = paste0('microclimate/micro_lai_',scenario,'_',year,'.Rda')) # save output
+```
+
+Get hourly rainfall
+
+```
+source('../Soil Moisture/disaggregate_rain.R')
+library('RODBC')
+channel <- odbcConnect("AWAPSoil")
+yearlist<-seq(ystart,(ystart+(nyears-1)),1)
+rainHR <- disagg_rain(loc = loc, ystart = ystart, yfinish = yfinish) 
+write.table(rainHR, file="rainHR_Bundey_Bore.csv",col.names=F, row.names = F) 
+```
+
+Run the model and save the output as an R data file.
+
+```{r}
+micro<-micro_aust(loc = longlat, LAI = LAI, ystart = ystart, yfinish = yfinish, PE = PE, BB = BB, BD = BD, KS = KS, BulkDensity = BulkDensity, maxshade = maxshade, Usrhyt = Usrhyt, DEP = DEP, spatial = "W:/", rainhourly = 1, rainhour = rainHR)
+save(micro,file = 'microclimate/micro_LAI_hourly.Rda.Rda') # save output
+```
+
+Soil properties for DAAS for comparison
+
+```{r}
+static_soil<-"w:/static_soil.nc"
+static_soil_data<-raster::brick(static_soil)
+static_soil_vars <- raster::extract(static_soil_data,cbind(loc[1],loc[2]))
+labels<-c('albedo','FAPAR1','FAPAR2','FAPAR3','FAPAR4','FAPAR5','FAPAR6','FAPAR7','FAPAR8','FAPAR9','FAPAR10','FAPAR11','FAPAR12','volwater_Upper','volwater_lower','thick_upper','thick_lower','code')
+colnames(static_soil_vars)<-labels
+
+filename<-"w:/ppfInterpAll.txt"
+ppf<-as.data.frame(read.table(file = filename, sep = ",", header=TRUE))
+filename<-"w:/Lumped soil types.txt"
+lumped.soil<-as.data.frame(read.table(file = filename, sep = ","))
+filename<-"w:/SoilTypeLUT_725_AWAP.csv"
+soiltype<-as.data.frame(read.table(file = filename, sep = ","))
+soilcode<-subset(soiltype, soiltype[1]==static_soil_vars[1,18])
+lumped<-subset(lumped.soil, V4==as.character(soilcode[1,2]))
+soiltype2<-lumped[1,6]
+soilprop<-subset(ppf, ppf==soilcode[1,2]) 
+McKenzie2000Table2<-as.data.frame(read.csv('../Soil Moisture/McKenzie2000Table2.csv'), stringsAsFactors=FALSE)
+dep1<-soilprop$Athick50
+dep2<-soilprop$Bthick50
+text1<-as.character(subset(McKenzie2000Table2, Texture.Group.Number==soilprop$Atext50)$Texture.Group)
+text2<-as.character(subset(McKenzie2000Table2, Texture.Group.Number==soilprop$Btext50)$Texture.Group)
+clay1<-soilprop$Aclay50
+clay2<-soilprop$Bclay50
+BD1<-soilprop$ABDensity50
+BD2<-soilprop$BBDensity50
+
+# empty arrays
+PE<-rep(0,19)
+BB<-PE
+KS<-PE
+BD<-PE
+
+# find half-way points between given depths
+DEP2<-rep(0,19)
+j<-1
+for(i in 1:length(DEP2-1)){ # loop through all depths
+  if(i%%2==0){ # alternates between nodes to get half way points
+    DEP2[i]<-DEP2[i-1]+(DEP[j]-DEP2[i-1])/2
+  }else{
+    DEP2[i]<-DEP[j]
+    j<-j+1
+  }
+}
+DEP2<-as.data.frame(floor(DEP2))
+colnames(DEP2)<-"DEPTH"
+BD[DEP2<=dep1*100]<-BD1
+BD[DEP2>dep1*100]<-BD2
+BB[DEP2<=dep1*100]<-subset(CampNormTbl9_1, Texture == text1)$b
+BB[DEP2>dep1*100]<-subset(CampNormTbl9_1, Texture == text2)$b
+KS[DEP2<=dep1*100]<-subset(CampNormTbl9_1, Texture == text1)$Ks
+KS[DEP2>dep1*100]<-subset(CampNormTbl9_1, Texture == text2)$Ks
+PE[DEP2<=dep1*100]<-subset(CampNormTbl9_1, Texture == text1)$airentry
+PE[DEP2>dep1*100]<-subset(CampNormTbl9_1, Texture == text2)$airentry
+profile<-as.data.frame(cbind(DEP, text1),stringsAsFactors=FALSE)
+profile[,1]<-as.numeric(profile[,1])
+colnames(profile)<-c("depth","soiltype")
+profile$soiltype[DEP>dep1*100]<-text2
+
+BulkDensity <- BD[seq(1,19,2)]*1000 #soil bulk density, kg/m3
+```
+
+
+Get qualitative soil type out of interest.
+
+```{r}
+# search through observed textures and find the nearest match to Campell and Norman's Table 9.1
+stypes<-NULL
+for(m in 1:nrow(soilpro)){
+  ssq<-(CampNormTbl9_1[,2]-soilpro[m,4]/100)^2 + (CampNormTbl9_1[,3]-soilpro[m,3]/100)^2
+  stypes[m]<-which(ssq==min(ssq))
+}
+
+# produce a table of the qualitative soil profile
+soils<-as.character(CampNormTbl9_1[,1])
+profile<-as.data.frame(cbind(soilpro[,1],soils[stypes]), stringsAsFactors=FALSE)
+profile[,1]<-as.numeric(profile[,1])
+colnames(profile)<-c("depth","soiltype")
+kable(profile)
+```  
+
+Run the model and save the output as an R data file.
+
+```{r}
+micro<-micro_aust(loc = longlat, LAI = LAI, ystart = ystart, yfinish = yfinish, PE = PE, BB = BB, BD = BD, KS = KS, BulkDensity = BulkDensity, maxshade = maxshade, Usrhyt = Usrhyt, DEP = DEP, spatial = "W:/")
+save(micro,file = 'microclimate/micro_LAI_DAAS.Rda') # save output
+```
+
+## References
+
+Campbell, G. S., and J. M. Norman. 1998. Environmental Biophysics. Springer, New York.

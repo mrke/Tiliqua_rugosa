@@ -1,0 +1,1077 @@
+---
+title: "Sleepy Lizard Distribution Maps"
+author: "Michael Kearney"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Sleepy Lizard Distribution Maps}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+ eval = TRUE, tidy.opts=list(width.cutoff=60), tidy=TRUE  
+)
+```
+
+## Overview
+
+
+## Load packages
+
+```{r}
+library(raster)
+library(rgdal)
+library(maptools)
+library(devtools)
+library(plyr) 
+library(ALA4R)
+ala_config(cache_directory=file.path("c:","mydata","ala_cache")) ## Windows
+library(grDevices)
+source('makegrids_yearout.R')
+source('makegrids_yearsout.R')
+source('makegrids_tLay.R')
+source('makegrids_lifetable.R')
+source('makegrids_yrrepro.R')
+source('plot_components_cv.R')
+source('plot_components_mean.R')
+```
+
+
+## Read in raw distribution data
+
+```{r}
+path<-'distribution/'
+files<-list.files(paste(path,'raw/',sep=""))
+files_yearsout<-files[grep(files, pattern = "yearsout")] # 20-year trajectory files for each starting year
+files_yearout<-files[grep(files, pattern = "yearout")] # 20-year trajectory files for each starting year
+
+P4S <- CRS("+proj=longlat +datum=WGS84")
+sleepy_limit <- readShapeLines(paste(path,"Sleepy_Dist_Limit.shp",sep=""), verbose=TRUE, proj4string=P4S)
+aust_bound<-readShapeLines("C:/Spatial_Data/Australia Vector Data/background/ausborder_polyline.shp", verbose=TRUE, proj4string=P4S)
+state_bound<-readShapeLines("C:/Spatial_Data/Australia Vector Data/background/state_boundaries.shp", verbose=TRUE, proj4string=P4S)
+dingo1<-readShapeLines("C:/Spatial_Data/Australia Vector Data/dingo fence/IQ_QLD_WILDDOG_BARRIER_FENCE.shp", verbose=TRUE, proj4string=P4S)
+dingo3<-readShapeLines("C:/Spatial_Data/Australia Vector Data/dingo fence/fenceroughdevrees.shp", verbose=TRUE, proj4string=P4S)
+sleepy_bound<-readShapeLines("distribution/Sleepy_Dist_Limit.shp", verbose=TRUE, proj4string=P4S)
+fill.na <- function(x, i=5) { # function to fill in NA values
+  if( is.na(x)[i] ) {
+    return( round(mean(x, na.rm=TRUE),2) )
+  } else {
+    return( round(x[i],2) )
+  }
+} 
+
+datas_yearout <- list()
+datas_yearsout <- list()
+
+start <- 1
+finish <- 10
+
+# read in all yearout input files and make a list of them
+for(filenum in start:finish){
+ data_yearout<-read.csv(paste(path,'raw/',files_yearout[filenum],sep=""),head = FALSE, stringsAsFactors = FALSE)
+ datas_yearout[[filenum]] <- data_yearout
+}
+
+# read in all yearouts input files and make a list of them
+for(filenum in start:finish){
+ data_yearsout<-read.csv(paste(path,'raw/',files_yearsout[filenum],sep=""),head = FALSE)
+ datas_yearsout[[filenum]] <- data_yearsout
+}
+scens <- c("1990-2009", "2060-2080 ACCESS 1.0", "2060-2080 ACCESS 1.3", "2060-2080 ACCESS 1.3 water", "1990-2009 31st March", "2060-2080 CanESM2", "1990-2009 water", "2060-2080 GDFLCM3", "2060-2080 HadGEM2-CC", "2060-2080 HadGEM2-ES")
+```
+
+## Get species distribution points
+
+```{r}
+species<-"Tiliqua rugosa"
+species_dist=occurrences(taxon=species, download_reason_id=10)
+species_dist.rugosa<-as.data.frame(species_dist$data)
+
+species<-"Tiliqua scincoides"
+species_dist=occurrences(taxon=species, download_reason_id=10)
+species_dist.scincoides<-as.data.frame(species_dist$data)
+
+species<-"Tiliqua occipitalis"
+species_dist=occurrences(taxon=species, download_reason_id=10)
+species_dist.occipitalis<-as.data.frame(species_dist$data)
+
+species<-"Tiliqua multifasciata"
+species_dist=occurrences(taxon=species, download_reason_id=10)
+species_dist.multifasciata<-as.data.frame(species_dist$data)
+
+species<-"Tiliqua nigrolutea"
+species_dist=occurrences(taxon=species, download_reason_id=10)
+species_dist.nigrolutea<-as.data.frame(species_dist$data)
+
+species<-"Liopholis kintorei"
+species_dist=occurrences(taxon=species, download_reason_id=10)
+species_dist.kintorei<-as.data.frame(species_dist$data)
+```
+
+## Generate surfaces for parturition days
+
+Preliminary runs for current and ACCESS 1.3 scenarios with a start date of 90 used to determine mean parturition day for final simulations.
+
+```
+
+circ.mean.month <- function(x){
+  conv <- pi / 6
+  m <- mean(exp(conv * (x) * 1i), na.rm = TRUE)
+  dir <- 12 + Arg(m) / conv %% 12 ## 'direction', i.e. average month
+  int <- Mod(m) ## 'intensity'
+  return(dir)
+}
+data2<-datas_yearsout[[4]] # read in the relevant layer
+tLay <- makegrids_tLay(data2 = data2, resamp = 1)
+for(i in 1:20){
+  x<-tLay[[i]]
+  x[x<1]<-NA
+  tLay[[i]] <- x
+}
+tLaymean <- calc(tLay, circ.mean.month)
+tLaymean[tLaymean > 13]<-tLaymean[tLaymean > 13]-12
+writeRaster(tLaymean, filename = 'tLaymean_cc.nc', overwrite = TRUE)
+plot(tLaymean)
+```
+
+## Summarise outputs per variable and scenario
+
+```{r}
+MONMATURES <- list() # list to put the different outputs into
+FECUNDITYS <- list() # list to put the different outputs into
+CLUTCHESS <- list() # list to put the different outputs into
+ANNUALACTS <- list() # list to put the different outputs into
+MINRESERVES <- list() # list to put the different outputs into
+TOTFOODS <- list() # list to put the different outputs into
+MINTBS <- list() # list to put the different outputs into
+MAXTBS <- list() # list to put the different outputs into
+Pct_Desics <- list() # list to put the different outputs into
+LifeSpans <- list() # list to put the different outputs into
+SVLs <- list() # list to put the different outputs into
+R0s <- list() # list to put the different outputs into
+rmaxs <- list() # list to put the different outputs into
+TTs <- list() # list to put the different outputs into
+survivs <- list() # list to put the different outputs into
+tLays <- list() # list to put the different outputs into
+yrRepros <- list() # list to put the different outputs into
+Bsks <- list() # list to put the different outputs into
+Fecs <- list() # list to put the different outputs into
+MaxDeps <- list() # list to put the different outputs into
+MaxWgts <- list() # list to put the different outputs into
+MaxLens <- list() # list to put the different outputs into
+MaxDesics <- list() # list to put the different outputs into
+
+variab = "MONMATURE"
+stat <- "max"
+resamp <- 1
+
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearout[[j]]
+  MONMATURE <- makegrids_yearout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  MONMATURES[[j]] <- MONMATURE
+}  
+save(MONMATURES, file = 'MONMATURES.Rda')
+
+variab = "FECUNDITY"
+stat <- "max"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearout[[j]]
+  FECUNDITY <- makegrids_yearout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  FECUNDITYS[[j]] <- FECUNDITY
+}  
+save(FECUNDITYS, file = 'FECUNDITYS.Rda')
+
+variab = "CLUTCHES"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearout[[j]]
+  CLUTCHES <- makegrids_yearout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  CLUTCHESS[[j]] <- CLUTCHES
+}  
+save(CLUTCHESS, file = 'CLUTCHESS.Rda')
+
+variab = "ANNUALACT"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearout[[j]]
+  ANNUALACT <- makegrids_yearout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  ANNUALACTS[[j]] <- ANNUALACT
+}  
+save(ANNUALACTS, file = 'ANNUALACTS.Rda')
+
+variab = "MINRESERVE"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearout[[j]]
+  MINRESERVE <- makegrids_yearout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  MINRESERVES[[j]] <- MINRESERVE
+}  
+save(MINRESERVES, file = 'MINRESERVES.Rda')
+
+variab = "TOTFOOD"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearout[[j]]
+  TOTFOOD <- makegrids_yearout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  TOTFOODS[[j]] <- TOTFOOD
+}  
+save(TOTFOODS, file = 'TOTFOODS.Rda')
+
+variab = "MINTB"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearout[[j]]
+  MINTB <- makegrids_yearout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  MINTBS[[j]] <- MINTB
+}  
+save(MINTBS, file = 'MINTBS.Rda')
+
+variab = "MAXTB"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearout[[j]]
+  MAXTB <- makegrids_yearout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  MAXTBS[[j]] <- MAXTB
+}  
+save(MAXTBS, file = 'MAXTBS.Rda')
+
+variab = "Pct_Desic"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearout[[j]]
+  Pct_Desic <- makegrids_yearout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  Pct_Desics[[j]] <- Pct_Desics
+}  
+save(Pct_Desics, file = 'Pct_Desics.Rda')
+
+variab = "LifeSpan"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearout[[j]]
+  LifeSpan <- makegrids_yearout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  LifeSpans[[j]] <- LifeSpan
+}  
+save(LifeSpans, file = 'LifeSpans.Rda')
+
+variab = "SVL"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearout[[j]]
+  SVL <- makegrids_yearout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  SVLs[[j]] <- SVL
+}  
+save(SVLs, file = 'SVLs.Rda')
+
+mi <- 0
+ma<- log(0.915) / -1317
+resamp <- 1
+stat <- "R0"
+act <- 2
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearsout[[j]]
+  R0 <- makegrids_lifetable(data2 = data2, mi = mi, ma = ma, resamp = resamp, stat = stat, act = act)
+  R0s[[j]] <- R0
+}  
+save(R0s, file = 'R0s.Rda')
+
+stat <- "rmax"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearsout[[j]]
+  rmax <- makegrids_lifetable(data2 = data2, mi = mi, ma = ma, resamp = resamp, stat = stat, act = act)
+  rmaxs[[j]] <- rmax
+}  
+save(rmaxs, file = 'rmaxs.Rda')
+
+stat <- "TT"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearsout[[j]]
+  TT <- makegrids_lifetable(data2 = data2, mi = mi, ma = ma, resamp = resamp, stat = stat, act = act)
+  TTs[[j]] <- TT
+}  
+save(TTs, file = 'TTs.Rda')
+
+stat <- "surviv"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearsout[[j]]
+  surviv <- makegrids_lifetable(data2 = data2, mi = mi, ma = ma, resamp = resamp, stat = stat, act = act)
+  survivs[[j]] <- surviv
+}  
+save(survivs, file = 'survivs.Rda')
+
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearsout[[j]]
+  tLay <- makegrids_tLay(data2 = data2, resamp = 1)
+  for(i in 1:20){
+    x<-tLay[[i]]
+    x[x<1]<-NA
+    tLay[[i]] <- x
+  }  
+  tLays[[j]] <- tLay
+}  
+save(tLays, file = 'tLays.Rda')
+
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearsout[[j]]
+  yrRepro <- makegrids_yrrepro(data2 = data2, resamp = 1)
+  yrRepros[[j]] <- yrRepro
+}  
+save(yrRepros, file = 'yrRepros.Rda')
+
+variab <- "Forage"
+stat <- "mean"
+Forages <- list() # list to put the different outputs into
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearsout[[j]]
+  Forage <- makegrids_yearsout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  Forages[[j]] <- Forage
+}  
+save(Forages, file = 'Forages.Rda')
+
+variab <- "Bsk"
+stat <- "mean"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearsout[[j]]
+  Bsk <- makegrids_yearsout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  Bsks[[j]] <- Bsk
+}  
+save(Bsks, file = 'Bsks.Rda')
+
+variab <- "Fec"
+stat <- "sum"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearsout[[j]]
+  Fec <- makegrids_yearsout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  Fecs[[j]] <- Fec
+}  
+save(Fecs, file = 'Fecs.Rda')
+
+variab <- "MaxDep"
+stat = "min"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearsout[[j]]
+  MaxDep <- makegrids_yearsout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  MaxDeps[[j]] <- MaxDep * -1 # depths are reported as negative
+}  
+save(MaxDeps, file = 'MaxDeps.Rda')
+
+variab <- "MaxWgt"
+stat = "max"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearsout[[j]]
+  MaxWgt <- makegrids_yearsout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  MaxWgts[[j]] <- MaxWgt
+}  
+save(MaxWgts, file = 'MaxWgts.Rda')
+
+variab <- "MaxLen"
+stat = "max"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearsout[[j]]
+  MaxLen <- makegrids_yearsout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  MaxLens[[j]] <- MaxLen
+}  
+save(MaxLens, file = 'MaxLens.Rda')
+
+variab <- "MaxDesic"
+stat = "max"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearsout[[j]]
+  MaxDesic <- makegrids_yearsout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  MaxDesics[[j]] <- MaxDesic
+}  
+save(MaxDesics, file = 'MaxDesics.Rda')
+
+CauseDeaths <- list() # list to put the different outputs into
+stat <- "max"
+for(j in start:finish){ # loop through files
+  data2 <- datas_yearsout[[j]]
+  CauseDeath <- makegrids_yearsout(data2 = data2, variab = variab, stat = stat, resamp = resamp)
+  CauseDeaths[[j]] <- CauseDeath
+}  
+save(CauseDeaths, file = 'CauseDeaths.Rda')
+```
+
+```{r}
+load('MONMATURES.Rda')
+load('FECUNDITYS.Rda')
+load('CLUTCHESS.Rda')
+load('ANNUALACTS.Rda')
+load('MINRESERVES.Rda')
+load('TOTFOODS.Rda')
+load('MINTBS.Rda')
+load('MAXTBS.Rda')
+load('Pct_Desics.Rda')
+load('LifeSpans.Rda')
+load('SVLs.Rda')
+load('R0s.Rda')
+load('rmaxs.Rda')
+load('TTs.Rda')
+load('survivs.Rda')
+load('tLays.Rda')
+load('yrRepros.Rda')
+load('Forages.Rda')
+load('Bsks.Rda')
+load('Fecs.Rda')
+load('MaxDeps.Rda')
+load('MaxWgts.Rda')
+load('MaxLens.Rda')
+load('MaxDesics.Rda')
+load('CauseDeaths.Rda')
+```
+
+Annual animations
+
+```{r}
+library(animation)
+fun2<-function(){
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(state_bound, col="black", lwd = 1.0, add = TRUE) 
+points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = addTrans("black",100), cex = 0.2, pch = 16)
+}
+ani.options(convert = "C:\\PROGRA~1\\ImageMagick-7.0.1-Q16\\convert.exe")
+# create movie of plant water content through all years (takes a long time)
+
+debpars=as.data.frame(read.csv('DEB model/DEB_pars_Tiliqua_rugosa.csv',header=FALSE))$V1 # read in DEB pars
+E_m <- ((debpars[16]/24)*debpars[8]/debpars[14])/(debpars[13]/24)
+scen <- stack(MINRESERVES[[1]]) / E_m * 100
+sub.dates <- paste0("Reserve Depletion (%) ",seq(1990,2009))
+brks <- seq(0, 100, 10)
+colfunc <- colorRampPalette(c("brown", "yellow", "light green", "dark green"))
+plot(scen[[1]], breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("Fertility",1989+i,".gif"), img.name = "Fertility", convert = "convert")
+
+scen <- stack(MINTBS[[1]])
+sub.dates <- paste0("Minimum Tb (C) ",seq(1990,2009))
+brks <- seq(0, 25, 5)
+colfunc <- colorRampPalette(c("blue", "light blue", "yellow", "orange", "red"))
+plot(scen[[1]], breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("MinTb",1989+i,".gif"), img.name = "MinTb", convert = "convert")
+
+scen <- stack(MAXTBS[[1]])
+sub.dates <- paste0("Maximum Tb (C) ",seq(1990,2009))
+brks <- seq(35, 45, 2)
+colfunc <- colorRampPalette(c("blue", "light blue", "yellow", "orange", "red"))
+plot(scen[[1]], breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("MaxTb",1989+i,".gif"), img.name = "MaxTb", convert = "convert")
+
+scen <- stack(LifeSpans[[1]])
+scen[scen == 0] <- 20
+sub.dates <- paste0("Life Span (Yrs) ",seq(1990,2009))
+brks <- seq(0, 20, 2)
+colfunc <- colorRampPalette(c("red", "orange", "yellow", "light blue", "grey"))
+plot(scen[[1]], breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("LifeSpan",1989+i,".gif"), img.name = "LifeSpan", convert = "convert")
+
+scen <- stack(SVLs[[1]]) 
+scen[scen < 270] <- 260
+sub.dates <- paste0("Snout Vent Length (mm) ",seq(1990,2009))
+brks <- seq(260, 340, 10)
+colfunc <- colorRampPalette(c("brown", "yellow", "light green", "dark green"))
+plot(scen[[1]], breaks = brks, col = c("grey", colfunc(length(brks)-2)), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = c("grey", colfunc(length(brks)-2)), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("SVL",1989+i,".gif"), img.name = "SVL", convert = "convert")
+
+scen <- stack(MONMATURES[[1]])/12
+sub.dates <- paste0("Years to Maturity ",seq(1990,2009))
+brks <- seq(0, 8, 1)
+colfunc <- colorRampPalette(c("orange", "yellow", "light blue", "dark blue"))
+plot(rep(1,10),col=colfunc(10),pch=19,cex=3)
+plot(scen[[1]], breaks = brks, col = c(colfunc(length(brks)-1)), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = c(colfunc(length(brks)-1)), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("YrMature",1989+i,".gif"), img.name = "YrMature", convert = "convert")
+
+scen <- stack(MaxDesics[[1]])
+sub.dates <- paste0("Maximum Desiccation (%) ",seq(1990,2009))
+brks <- seq(0, 40, 5)
+colfunc <- colorRampPalette(c("light blue", "orange", "brown"))
+plot(scen[[1]], breaks = brks, col = c(colfunc(length(brks)-2), 'black'), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = c(colfunc(length(brks)-2), 'red'), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("MaxDesic",1989+i,".gif"), img.name = "MaxDesic", convert = "convert")
+
+scen <- stack(R0s[[1]])
+sub.dates <- paste0('R0 ',seq(1990,2009))
+brks <- seq(0, 7, 1)
+colfunc <- colorRampPalette(c("brown", "yellow", "light green", "dark green"))
+plot(scen[[1]], breaks = brks, col = c("grey", colfunc(length(brks)-2)), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = c("grey", colfunc(length(brks)-2)), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("R0",1989+i,".gif"), img.name = "R0", convert = "convert")
+
+scen <- stack(rmaxs[[1]])
+scen[scen < 0] <- -0.02
+sub.dates <- paste0('rmax ',seq(1990,2009))
+brks <- seq(-0.02, 0.18, 0.02)
+colfunc <- colorRampPalette(c("brown", "yellow", "light green", "dark green"))
+plot(scen[[1]], breaks = brks, col = c("grey", colfunc(length(brks)-2)), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = c("grey", colfunc(length(brks)-2)), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("rmax",1989+i,".gif"), img.name = "rmax", convert = "convert")
+
+scen <- stack(TTs[[1]])
+scen[scen < 0] <- -0.02
+sub.dates <- paste0('Generation Time (y) ',seq(1990,2009))
+brks <- seq(-0.02, 0.18, 0.02)
+colfunc <- colorRampPalette(c("brown", "yellow", "light green", "dark green"))
+plot(scen[[1]], breaks = brks, col = c("grey", colfunc(length(brks)-2)), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = c("grey", colfunc(length(brks)-2)), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("GenTime",1989+i,".gif"), img.name = "GenTime", convert = "convert")
+
+scen <- stack(survivs[[1]])
+sub.dates <- paste0('Annual Survival Probability ',seq(1990,2009))
+brks <- seq(0.8, 1, 0.02)
+colfunc <- colorRampPalette(c("brown", "yellow", "light green", "dark green"))
+plot(scen[[1]], breaks = brks, col = c("grey", colfunc(length(brks)-2)), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = c("grey", colfunc(length(brks)-2)), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("Survival",1989+i,".gif"), img.name = "Survival", convert = "convert")
+
+scen <- stack(tLays[[1]])
+sub.dates <- paste0('Parturition Month ',seq(1990,2009))
+brks <- seq(0, 13, 1)
+cols <- c("grey", "firebrick3", "orange2", "orange1", "orange3", "dodgerblue2", "dodgerblue1", "dodgerblue3", "chartreuse2", "chartreuse1", "chartreuse3", "firebrick1", "firebrick2")
+plot(scen[[1]], breaks = brks, col = cols, zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = cols, main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("Parturition",1989+i,".gif"), img.name = "Parturition", convert = "convert")
+
+scen <- stack(yrRepros[[1]])
+sub.dates <- paste0('Year First Reproduction ',seq(1990,2009))
+brks <- seq(0, 20, 2)
+colfunc <- colorRampPalette(rev(c("brown", "yellow", "light green", "dark green")))
+plot(scen[[1]], breaks = brks, col = c("grey", colfunc(length(brks)-2)), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = c("grey", colfunc(length(brks)-2)), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("Yr1stRepro",1989+i,".gif"), img.name = "Yr1stRepro", convert = "convert")
+
+scen <- stack(Fec[[1]])
+sub.dates <- paste0("Fertility ",seq(1990,2009))
+brks <- c(0, 1, 2, seq(5, 45, 5))
+colfunc <- colorRampPalette(c("brown", "yellow", "light green", "dark green"))
+plot(scen[[1]], breaks = brks, col = c("grey", colfunc(length(brks)-2)), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = c("grey", colfunc(length(brks)-2)), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("Fertility",1989+i,".gif"), img.name = "Fertility", convert = "convert")
+
+scen <- stack(MaxDeps[[1]])
+sub.dates <- paste0("Maximum Depth (cm) ",seq(1990,2009))
+brks <- seq(0, 200, 20)
+colfunc <- colorRampPalette(c("light blue", "yellow", "orange"))
+plot(scen[[1]], breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("Depth",1989+i,".gif"), img.name = "Depth", convert = "convert")
+
+scen <- stack(MaxWgts[[1]])/1000
+sub.dates <- paste0("Maximum Weight (kg) ",seq(1990,2009))
+brks <- seq(0, 2.2, 0.2)
+colfunc <- colorRampPalette(c("brown", "yellow", "light green", "dark green"))
+plot(scen[[1]], breaks = brks, col = c("grey", colfunc(length(brks)-2)), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = c("grey", colfunc(length(brks)-2)), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("MaxWgt",1989+i,".gif"), img.name = "MaxWgt", convert = "convert")
+
+scen <- stack(MaxLens[[1]])
+sub.dates <- paste0("Snout Vent Length (mm) ",seq(1990,2009))
+brks <- seq(150, 350, 25)
+colfunc <- colorRampPalette(c("brown", "yellow", "light green", "dark green"))
+plot(scen[[1]], breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("SVL",1989+i,".gif"), img.name = "SVL", convert = "convert")
+
+scen <- stack(MaxDesics[[1]])
+sub.dates <- paste0("Maximum Desiccation (%) ",seq(1990,2009))
+brks <- seq(0, 40, 5)
+colfunc <- colorRampPalette(c("light blue", "orange", "brown"))
+plot(scen[[1]], breaks = brks, col = c(colfunc(length(brks)-2), 'black'), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = c(colfunc(length(brks)-2), 'red'), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("MaxDesic",1989+i,".gif"), img.name = "MaxDesic", convert = "convert")
+
+scen <- stack(CauseDeaths[[1]])
+sub.dates <- paste0("Cause of Death ",seq(1990,2009))
+brks <- seq(0, 40, 5)
+colfunc <- colorRampPalette(c("light blue", "orange", "brown"))
+plot(scen[[1]], breaks = brks, col = c(colfunc(length(brks)-2), 'black'), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = c(colfunc(length(brks)-2), 'red'), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("CauseDeath",1989+i,".gif"), img.name = "CauseDeath", convert = "convert")
+
+scen <- stack(Forages[[1]])
+sub.dates <- paste0("Foraging Time (h) ",seq(1990,2009))
+brks <- seq(0, 300, 25)
+colfunc <- colorRampPalette(c("blue", "light blue", "yellow", "orange", "red"))
+plot(scen[[1]], breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("Forage",1989+i,".gif"), img.name = "Forage", convert = "convert")
+
+scen <- stack(Bsks[[1]]) + stack(Forages[[1]])
+sub.dates <- paste0("Activity Time (h) ",seq(1990,2009))
+brks <- seq(0, 2000, 200)
+colfunc <- colorRampPalette(c("blue", "light blue", "yellow", "orange", "red"))
+plot(scen[[1]], breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)))
+saveGIF(expr=animate(scen, n=1, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), main=sub.dates, addfun=fun2), interval = 1,  movie.name = paste0("Activity",1989+i,".gif"), img.name = "Activity", convert = "convert")
+```
+
+Mean plots for Figure 11.
+
+```{r}
+scenario <- 7
+filename <- paste("distribution/mapped_outputs_unlimited.pdf",sep="") 
+plot_components_mean(scenario = scenario, filename = filename)
+
+scenario <- 1
+filename <- paste("distribution/mapped_outputs_limited.pdf",sep="") 
+plot_components_mean(scenario = scenario, filename = filename)
+```
+
+Mean plots for fitness components under the ACCESS 1.0 and 1.3 scenarios.
+
+```{r}
+scenario <- 2
+filename <- paste("distribution/mapped_outputs_limited_ACCESS10.pdf",sep="") 
+plot_components_mean(scenario = scenario, filename = filename)
+
+scenario <- 3
+filename <- paste("distribution/mapped_outputs_limited_ACCESS13.pdf",sep="") 
+plot_components_mean(scenario = scenario, filename = filename)
+```
+
+Coefficient of variation plots.
+
+```{r}
+
+scenario <- 1
+filename<-paste("distribution/mapped_outputs_cv_limited.pdf",sep="") 
+plot_components_cv(scenario = scenario, filename = filename)
+
+scenario <- 2
+filename<-paste("distribution/mapped_outputs_cv_limited_ACCESS10.pdf",sep="") 
+plot_components_cv(scenario = scenario, filename = filename)
+
+scenario <- 3
+filename<-paste("distribution/mapped_outputs_cv_limited_ACCESS13.pdf",sep="") 
+plot_components_cv(scenario = scenario, filename = filename)
+```
+
+Net reproductive rate Fig. 12
+
+```{r}
+# filename <- paste("distribution/mapped_outputs_R0.pdf",sep="") 
+# pdf(filename,paper="A4r",width=15,height=4.5) # doing this means you're going to make a pdf - comment this line out if you want to see them in R
+# par(mfrow = c(2, 5))
+# par(oma = c(0, 0, 0, 3) + 0.1) # margin spacing stuff
+# par(mar = c(1, 1, 1, 3)) # margin spacing stuff 
+# par(mgp = c(3, 1, 0) ) # margin spacing stuff  
+# sequen <- c(7, 4, 1, 5, 6, 2, 3, 8, 9, 10)  
+# for(i in 1:10){
+# scen <- stack(R0s[[sequen[i]]])
+# brks <- c(0, 1, seq(2, 12, 2))
+# colfunc <- colorRampPalette(c("grey","brown", "yellow", "light green", "dark green"))
+# plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), main = scens[sequen[i]], asp = T)
+# plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+# points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+# plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+# }
+# dev.off()
+
+filename <- paste("distribution/mapped_outputs_R0.pdf",sep="") 
+pdf(filename,paper="A4r",width=15,height=4.5) # doing this means you're going to make a pdf - comment this line out if you want to see them in R
+par(mfrow = c(1, 2))
+par(oma = c(0, 0, 0, 3) + 0.1) # margin spacing stuff
+par(mar = c(1, 1, 1, 3)) # margin spacing stuff 
+par(mgp = c(3, 1, 0) ) # margin spacing stuff  
+sequen <- c(7, 1)  
+for(i in 1:2){
+scen <- stack(R0s[[sequen[i]]])
+brks <- c(0, 1, 2, seq(3, 9, 1))
+colfunc <- colorRampPalette(c("grey","brown", "yellow", "light green", "green", "dark green"))
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), asp = T)
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+}
+dev.off()
+```
+
+Climate change deltas for Figure 13.
+
+```{r}
+filename <- paste("distribution/mapped_outputs_delta.pdf",sep="") 
+pdf(filename,paper="A4r",width=19,height=5.5) # doing this means you're going to make a pdf - comment this line out if you want to see them in R
+sequen <- c(7, 4, 1, 5, 6, 2, 3, 8, 9, 10)  
+brks <-c(seq(-4,-1),-0.25,0.25,seq(1,4))
+colfunc1 <- colorRampPalette(c("red", "orange", "yellow"))
+colfunc2 <- colorRampPalette(c("green", "green3", "green4"))
+par(mfrow = c(2, 3))
+par(oma = c(0, 0, 0, 3) + 0.1) # margin spacing stuff
+par(mar = c(1, 1, 1, 3.5)) # margin spacing stuff 
+par(mgp = c(3, 1, 0) ) # margin spacing stuff  
+
+# scen <- stack(R0s[[sequen[2]]] - R0s[[sequen[1]]])
+# plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = c(colfunc1(4), "white", colfunc2(5)), zlim = c(min(brks), max(brks)), asp = T, main = "ACCESS 1.3 unlimited")
+# plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+# plot(sleepy_bound, col="black", lwd = 2, add = TRUE, lty = 1) 
+# plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = c(colfunc1(4), "white", colfunc2(4)), zlim = c(min(brks), max(brks)), legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+# 
+# scen <- stack(R0s[[sequen[4]]] - R0s[[sequen[3]]])
+# plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = c(colfunc1(4), "white", colfunc2(4)), zlim = c(min(brks), max(brks)), asp = T, main = "31st March birth")
+# plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+# plot(sleepy_bound, col="black", lwd = 2, add = TRUE, lty = 1) 
+# plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = c(colfunc1(4), "white", colfunc2(4)), zlim = c(min(brks), max(brks)), legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+
+scen <- stack(R0s[[sequen[6]]] - R0s[[sequen[3]]])
+scen[scen > 4] <- 4
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = c(colfunc1(4), "white", colfunc2(4)), zlim = c(min(brks), max(brks)), asp = T, main = "ACCESS 1.0")
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(sleepy_bound, col="black", lwd = 2, add = TRUE, lty = 1) 
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = c(colfunc1(4), "white", colfunc2(4)), zlim = c(min(brks), max(brks)), legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+
+scen <- stack(R0s[[sequen[7]]] - R0s[[sequen[3]]])
+scen[scen > 4] <- 4
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = c(colfunc1(4), "white", colfunc2(4)), zlim = c(min(brks), max(brks)), asp = T, main = "ACCESS 1.3")
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(sleepy_bound, col="black", lwd = 2, add = TRUE, lty = 1) 
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = c(colfunc1(4), "white", colfunc2(4)), zlim = c(min(brks), max(brks)), legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+
+scen <- stack(R0s[[sequen[5]]] - R0s[[sequen[3]]])
+scen[scen > 4] <- 4
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = c(colfunc1(4), "white", colfunc2(4)), zlim = c(min(brks), max(brks)), asp = T, main = "CanESM2")
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(sleepy_bound, col="black", lwd = 2, add = TRUE, lty = 1) 
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = c(colfunc1(4), "white", colfunc2(4)), zlim = c(min(brks), max(brks)), legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+
+scen <- stack(R0s[[sequen[8]]] - R0s[[sequen[3]]])
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = c(colfunc1(4), "white", colfunc2(4)), zlim = c(min(brks), max(brks)), asp = T, main = "GDFLCM3")
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(sleepy_bound, col="black", lwd = 2, add = TRUE, lty = 1) 
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = c(colfunc1(4), "white", colfunc2(4)), zlim = c(min(brks), max(brks)), legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+
+scen <- stack(R0s[[sequen[9]]] - R0s[[sequen[3]]])
+scen[scen > 4] <- 4
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = c(colfunc1(4), "white", colfunc2(4)), zlim = c(min(brks), max(brks)), asp = T, main = "HadGEM2-CC")
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(sleepy_bound, col="black", lwd = 2, add = TRUE, lty = 1) 
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = c(colfunc1(4), "white", colfunc2(4)), zlim = c(min(brks), max(brks)), legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+
+scen <- stack(R0s[[sequen[10]]] - R0s[[sequen[3]]])
+scen[scen > 4] <- 4
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = c(colfunc1(4), "white", colfunc2(4)), zlim = c(min(brks), max(brks)), asp = T, main = "HadGEM2-ES")
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(sleepy_bound, col="black", lwd = 2, add = TRUE, lty = 1) 
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = c(colfunc1(4), "white", colfunc2(4)), zlim = c(min(brks), max(brks)), legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+dev.off()
+```
+
+Figure S5, plots of R0 under different climate change scenarios.
+
+```{r}
+filename <- paste("distribution/mapped_outputs_R0_cc.pdf",sep="") 
+pdf(filename,paper="A4r",width=15,height=4.5) # doing this means you're going to make a pdf - comment this line out if you want to see them in R
+par(mfrow = c(2, 3))
+par(oma = c(0, 0, 0, 3) + 0.1) # margin spacing stuff
+par(mar = c(1, 1, 1, 3)) # margin spacing stuff 
+par(mgp = c(3, 1, 0) ) # margin spacing stuff  
+sequen <- c(7, 4, 1, 5, 6, 2, 3, 8, 9, 10)  
+
+scen <- stack(R0s[[sequen[6]]])
+brks <- c(0, 1, 2, seq(3, 9, 1))
+colfunc <- colorRampPalette(c("grey","brown", "yellow", "light green", "green", "dark green"))
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), asp = T, main = "ACCESS 1.0")
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(sleepy_bound, col="black", lwd = 2, add = TRUE, lty = 1) 
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+
+scen <- stack(R0s[[sequen[7]]])
+brks <- c(0, 1, 2, seq(3, 9, 1))
+colfunc <- colorRampPalette(c("grey","brown", "yellow", "light green", "green", "dark green"))
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), asp = T, main = "ACCESS 1.3")
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(sleepy_bound, col="black", lwd = 2, add = TRUE, lty = 1) 
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+
+scen <- stack(R0s[[sequen[5]]])
+brks <- c(0, 1, 2, seq(3, 9, 1))
+colfunc <- colorRampPalette(c("grey","brown", "yellow", "light green", "green", "dark green"))
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), asp = T, main = "CanESM2")
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(sleepy_bound, col="black", lwd = 2, add = TRUE, lty = 1) 
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+
+scen <- stack(R0s[[sequen[8]]])
+brks <- c(0, 1, 2, seq(3, 9, 1))
+colfunc <- colorRampPalette(c("grey","brown", "yellow", "light green", "green", "dark green"))
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), asp = T, main = "GDFLCM3")
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(sleepy_bound, col="black", lwd = 2, add = TRUE, lty = 1) 
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+
+scen <- stack(R0s[[sequen[9]]])
+brks <- c(0, 1, 2, seq(3, 9, 1))
+colfunc <- colorRampPalette(c("grey","brown", "yellow", "light green", "green", "dark green"))
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), asp = T, main = "HadGEM2-CC")
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(sleepy_bound, col="black", lwd = 2, add = TRUE, lty = 1) 
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+
+scen <- stack(R0s[[sequen[10]]])
+brks <- c(0, 1, 2, seq(3, 9, 1))
+colfunc <- colorRampPalette(c("grey","brown", "yellow", "light green", "green", "dark green"))
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), asp = T, main = "HadGEM2-ES")
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(sleepy_bound, col="black", lwd = 2, add = TRUE, lty = 1) 
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+
+dev.off()
+```
+
+
+scen <- stack(tLays[[7]])
+brks <- seq(0, 13, 1)
+cols <- c("grey", "firebrick3", "orange2", "orange1", "orange3", "dodgerblue2", "dodgerblue1", "dodgerblue3", "chartreuse2", "chartreuse1", "chartreuse3", "firebrick1", "firebrick2")
+plot(calc(scen, mean, na.rm = TRUE), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = cols, zlim = c(min(brks), max(brks)), main = "Parturition (month)")
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(calc(scen, mean, na.rm = TRUE), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = TRUE, breaks = brks, col = cols, zlim = c(min(brks), max(brks)), main = "Parturition (month)", legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+points(species_dist.nigrolutea$longitude, species_dist.nigrolutea$latitude, col = "black", cex = 0.2, pch = 16)
+plot(sleepy_bound, col="black", lwd = 2, add = TRUE, lty = 1) 
+points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+points(species_dist.scincoides$longitude, species_dist.scincoides$latitude, col = "black", cex = 0.2, pch = 16)
+
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), main = scens[sequen[i]], asp = F)
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+
+
+scen <- stack(R0s[[1]])
+brks <- c(0, 1.4, seq(2, 12, 2))
+colfunc <- colorRampPalette(c("grey","brown", "yellow", "light green", "dark green"))
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), main = "Net Reproductive Rate")
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), main = "Net Reproductive Rate", legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+
+
+scen <- stack(R0s[[7]])
+brks <- c(0, 1, seq(2, 12, 2))
+colfunc <- colorRampPalette(c("grey","brown", "yellow", "light green", "dark green"))
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), main = "Net Reproductive Rate")
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, breaks = brks, col = colfunc(length(brks)-1), zlim = c(min(brks), max(brks)), main = "Net Reproductive Rate", legend.only=TRUE, legend.width=2, legend.shrink=0.6, legend.args=list(text = "",side=4, font=2, line=2.5, cex=0.8))
+
+```
+
+
+
+```{r}
+
+
+scen <- stack(R0s[[1]])
+sub.dates <- paste0('R0 ',seq(1990,2009))
+brks <- seq(0, 7, 1)
+colfunc <- colorRampPalette(c("brown", "yellow", "light green", "dark green"))
+plot(calc(scen, mean), ylim=c(-45, -10),xlim=c(105, 155),axes = F, box = FALSE, legend = TRUE, breaks = brks, col = c("grey", colfunc(length(brks)-2)), zlim = c(min(brks), max(brks)))
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(sleepy_bound, col="black", lwd = 2, add = TRUE, lty = 1) 
+
+
+
+
+data2 <- datas_yearsout[[1]]
+
+
+tLaymean2 <- tLaymean
+tLaymean2[tLaymean2 < 2]<-0
+tLaymean2[tLaymean2 > 7]<-0
+tLaymean2[tLaymean2 > 0]<-1
+
+
+data2<-read.csv(paste(path,'raw/',files_yearsout[1],sep=""),head=FALSE)
+ma<- log(0.915)/-1317*1
+#ma <- 1.5e-4
+mi <- 0
+#ma <- 0.00001
+resamp <- 0
+stat <- "R0"
+act <- 2
+R0 <- makegrids_lifetable(data2 = data2, mi = mi, ma = ma, resamp = resamp, stat = stat, act = act)
+R02 <- R0 #* tLaymean2
+R02[R0 < 1] <- 0
+plot(calc(R02, sd)/calc(R02, mean), zlim = c(0.05, 5) )#, ylim = c(0,5))
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(state_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(dingo1, col="blue", lwd = 2.0, add = TRUE) 
+plot(dingo3, col="blue", lwd = 2.0, add = TRUE) 
+points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+points(species_dist.scincoides$longitude, species_dist.scincoides$latitude, col = "black", cex = 0.2, pch = 16)
+points(species_dist.nigrolutea$longitude, species_dist.nigrolutea$latitude, col = "black", cex = 0.2, pch = 16)
+points(species_dist.occipitalis$longitude, species_dist.occipitalis$latitude, col = "black", cex = 0.2, pch = 16)
+points(species_dist.multifasciata$longitude, species_dist.multifasciata$latitude, col = "black", cex = 0.2, pch = 16)
+
+points(species_dist.kintorei$longitude, species_dist.kintorei$latitude, col = "black", cex = 0.2, pch = 16)
+
+stat <- "rmax"
+act <- 2
+rmax <- makegrids_lifetable(data2 = data2, mi = mi, ma = ma, resamp = resamp, stat = stat, act = act)
+rmax2 <- rmax
+rmax2[rmax < 0] <- 0
+plot(mean(rmax2))
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(state_bound, col="black", lwd = 1.0, add = TRUE) 
+#plot(dingo1, col="blue", lwd = 3.0, add = TRUE) 
+#plot(dingo3, col="blue", lwd = 3.0, add = TRUE) 
+points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+
+stat <- "TT"
+act <- 2
+TT <- makegrids_lifetable(data2 = data2, mi = mi, ma = ma, resamp = resamp, stat = stat, act = act)
+TT2 <- TT
+#TT2[TT < 0] <- 0
+plot(mean(TT2))
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(state_bound, col="black", lwd = 1.0, add = TRUE) 
+#plot(dingo1, col="blue", lwd = 3.0, add = TRUE) 
+#plot(dingo3, col="blue", lwd = 3.0, add = TRUE) 
+points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+
+stat <- "surviv"
+act <- 2
+surviv <- makegrids_lifetable(data2 = data2, mi = mi, ma = ma, resamp = resamp, stat = stat, act = act)
+surviv2 <- surviv
+#surviv2[surviv < 0] <- 0
+plot(mean(surviv2))
+plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+plot(state_bound, col="black", lwd = 1.0, add = TRUE) 
+#plot(dingo1, col="blue", lwd = 3.0, add = TRUE) 
+#plot(dingo3, col="blue", lwd = 3.0, add = TRUE) 
+points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+```
+
+
+## Foraging
+
+```{r}
+# palette
+brks <- c(0, seq(1, 350, 10)) # life-time repro range 0-55
+nb <- length(brks) - 1
+nb2 <- nb*2
+cols <- rev(terrain.colors(nb)) 
+
+load('Forages.Rda')
+for(j in 1:length(Forages)){ # loop through scenarios
+  plot(mean(Forages[[j]], na.rm = TRUE), zlim = c(min(brks),max(brks)), ylim = c(-45,-10), xlim = c(105, 155), axes = F, box = FALSE, legend = TRUE, breaks = brks, col = cols, asp = NA) 
+  plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+  mtext(files[j])
+  points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+}  
+```
+
+## Basking
+
+```{r}
+# palette
+brks <- seq(0, 2500, 250) # life-time repro range 0-55
+nb <- length(brks) - 1
+nb2 <- nb*2
+cols <- rev(terrain.colors(nb2))[nb:nb2] # use the greener colours
+
+load('Forages.Rda')
+for(j in 1:length(Bsks)){ # loop through scenarios
+  plot(max(Bsks[[j]], na.rm = TRUE), zlim = c(min(brks),max(brks)), ylim = c(-45,-10), xlim = c(105, 155), axes = F, box = FALSE, legend = TRUE, breaks = brks, col = cols, asp = NA) 
+  plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+  mtext(files[j])
+  points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+}  
+```
+
+## Depth
+
+```{r}
+# palette
+brks <- c(0., 1.,  3, 5.,  10,  15,  30.,  60.,  100.) # life-time repro range 0-55
+nb <- length(brks) - 1
+cols <- rev(terrain.colors(nb)) # use the greener colours
+
+load('MaxDeps.Rda')
+for(j in 1:length(MaxDeps)){ # loop through scenarios
+  plot(max(MaxDeps[[j]], na.rm = TRUE), zlim = c(min(brks),max(brks)), ylim = c(-45,-10), xlim = c(105, 155), axes = F, box = FALSE, legend = TRUE, breaks = brks, col = cols, asp = NA) 
+  plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+  mtext(files[j])
+  points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+}  
+```
+
+## Reproductive output
+
+```{r}
+# palette
+brks <- c(0, 1, 2, seq(5, 55, 10)) # life-time repro range 0-55
+nb <- length(brks) - 1
+nb2 <- nb*2
+cols <- rev(terrain.colors(nb2))[nb:nb2] # use the greener colours
+
+load('Fecs.Rda')
+for(j in 1:length(Fecs)){ # loop through scenarios
+  plot(sum(Fecs) / 20, zlim = c(min(brks),max(brks)), ylim = c(-45,-10), xlim = c(105, 155), axes = F, box = FALSE, legend = TRUE, breaks = brks, col = cols) 
+  plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+  mtext(files[j])
+  points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+}  
+```
+
+## Maximum Weight
+
+```{r}
+# palette
+brks <- c(0, seq(100, 1500, 100)) # life-time repro range 0-55
+nb <- length(brks) - 1
+nb2 <- nb*2
+cols <- rev(terrain.colors(nb2))[nb:nb2] # use the greener colours
+
+load('MaxWgts.Rda')
+for(j in 1:length(MaxWgts)){ # loop through scenarios
+  plot(sum(MaxWgts[[j]]) / 20, zlim = c(min(brks),max(brks)), ylim = c(-45,-10), xlim = c(105, 155), axes = F, box = FALSE, legend = TRUE, breaks = brks, col = cols, asp = NA) 
+  plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+  mtext(files[j])
+  points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+}  
+```
+
+## Maximum Length
+
+```{r}
+# palette
+brks <- seq(100, 350, 25) # life-time repro range 0-55
+nb <- length(brks) - 1
+nb2 <- nb*2
+cols <- rev(terrain.colors(nb2))[nb:nb2] # use the greener colours
+
+load('MaxLens.Rda')
+for(j in 1:length(MaxLens)){ # loop through scenarios
+  plot(sum(MaxLens[[j]]) / 20, zlim = c(min(brks),max(brks)), ylim = c(-45,-10), xlim = c(105, 155), axes = F, box = FALSE, legend = TRUE, breaks = brks, col = cols, asp = NA) 
+  plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+  mtext(files[j])
+  points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+}  
+```
+
+## Desiccation
+
+```{r}
+# palette
+brks <- c(0, seq(1, 36, 1)) # life-time repro range 0-55
+nb <- length(brks) - 1
+nb2 <- nb*2
+cols <- rev(terrain.colors(nb2))[nb:nb2] # use the greener colours
+
+load('Bsks.Rda')
+for(j in 1:length(Bsks)){ # loop through scenarios
+  plot(max(Bsks[[j]], na.rm = TRUE), zlim = c(min(brks),max(brks)), ylim = c(-45,-10), xlim = c(105, 155), axes = F, box = FALSE, legend = TRUE, breaks = brks, col = cols, asp = NA) 
+  plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+  mtext(files[j])
+  points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+}  
+```
+
+## Cause of Death
+
+```{r}
+# palette
+brks <- seq(-1,5,1) # 0 no death, 1 cold, 2 heat, 3 desiccation, 4 starve, 5 ageing
+cols <- c("dark grey", "blue", "red", "cyan", "orange", "purple") # use the greener colours
+
+load('CauseDeaths.Rda')
+for(j in 1:length(CauseDeaths)){ # loop through scenarios
+  plot(min(CauseDeaths[[j]], na.rm=TRUE) , zlim = c(min(brks),max(brks)), ylim = c(-45,-10), xlim = c(105, 155), axes = F, box = FALSE, legend = TRUE, breaks = brks, col = cols, asp = NA) 
+  plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+  mtext(files[j])
+  points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+}  
+```
+
+## tLay
+
+```{r}
+# palette
+brks <- seq(1,400,30) # 0 no death, 1 cold, 2 heat, 3 desiccation, 4 starve, 5 ageing
+nb <- length(brks) - 1
+nb2 <- nb*2
+cols <- rev(rainbow(nb2))[nb:nb2] # use the greener colours
+
+load('tLays.Rda')
+for(j in 1:length(tLays)){ # loop through scenarios
+  plot(mean(tLays[[j]], na.rm=TRUE) , zlim = c(min(brks),max(brks)), ylim = c(-45,-10), xlim = c(105, 155), axes = F, box = FALSE, legend = TRUE, breaks = brks, col = cols, asp = NA) 
+  plot(aust_bound, col="black", lwd = 1.0, add = TRUE) 
+  mtext(files[j])
+  points(species_dist.rugosa$longitude, species_dist.rugosa$latitude, col = "black", cex = 0.2, pch = 16)
+}  
+```
