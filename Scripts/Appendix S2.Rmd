@@ -1,11 +1,11 @@
 ---
-title: "Appendix 1"
+title: "Appendix S2"
 author: "Michael Kearney"
 date: "`r Sys.Date()`"
 output: pdf_document
 classoption: landscape
 vignette: >
-  %\VignetteIndexEntry{Appendix 1. Waddleometer test: Comparison of observed and predicted (waddleometer) body activity, body temperature and body mass}
+  %\VignetteIndexEntry{Appendix S2. Waddleometer test: Comparison of observed and predicted (waddleometer) body activity, body temperature and body mass}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---

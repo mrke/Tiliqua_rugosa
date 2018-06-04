@@ -1,5 +1,5 @@
 ---
-title: "Appendix 2"
+title: "Appendix S3"
 author: "Michael Kearney"
 date: "`r Sys.Date()`"
 output:
@@ -7,7 +7,7 @@ output:
     toc: true
 classoption: landscape
 vignette: >
-  %\VignetteIndexEntry{Appendix 2. Tiliqua rugosa length weight test simulation at Bundey Bore}
+  %\VignetteIndexEntry{Appendix S3. Tiliqua rugosa length weight test simulation at Bundey Bore}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
